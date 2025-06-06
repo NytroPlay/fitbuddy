@@ -95,6 +95,7 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
                 Expanded(
                   child: LinearProgressIndicator(
                     value: total == 0 ? 0 : completados / total,
+                    // ignore: deprecated_member_use
                     backgroundColor: AppColors.primary.withOpacity(0.15),
                     color: AppColors.success,
                     minHeight: 8,
@@ -137,6 +138,7 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
                                 shape: BoxShape.circle,
                                 gradient: LinearGradient(
                                   colors: [
+                                    // ignore: deprecated_member_use
                                     AppColors.primary.withOpacity(0.15),
                                     Colors.white,
                                   ],
@@ -178,6 +180,7 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
+                                // ignore: deprecated_member_use
                                 color: AppColors.primary.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),

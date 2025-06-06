@@ -1,57 +1,64 @@
 import 'package:flutter/material.dart';
-import '../navigation/main_navigation.dart';
-import 'register_screen.dart';
 import '../utils/app_theme.dart';
+import '../utils/user_prefs.dart';
+import '../navigation/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, required Null Function() onLogin});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isPasswordVisible = false;
+  final _formKey = GlobalKey<FormState>();
+  String? _error;
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final user = await UserPrefs.loadUser();
+    if (user != null &&
+        user.email == _emailController.text.trim() &&
+        user.password == _passwordController.text) {
+      // Login exitoso, navega a la app principal
+      Navigator.pushReplacement(
+        // ignore: use_build_context_synchronously
+        context,
+        MaterialPageRoute(builder: (context) => MainNavigation()),
+      );
+    } else {
+      setState(() {
+        _error = 'Email o contraseña incorrectos';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Iniciar Sesión'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(height: 60),
-
-              // Logo y título
+              SizedBox(height: 40),
               Center(
                 child: Column(
                   children: [
-                    // Logo placeholder (puedes agregar tu logo aquí)
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        Icons.fitness_center,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
-                    SizedBox(height: 24),
-
-                    // Título FitBuddy
                     Text(
-                      'FitBuddy',
-                      style: Theme.of(context).textTheme.headlineLarge
+                      '¡Bienvenido de nuevo!',
+                      style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
@@ -59,18 +66,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Tu compañero de fitness',
+                      'Inicia sesión para continuar',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
-
-              SizedBox(height: 60),
-
-              // Formulario de login
+              SizedBox(height: 40),
               Container(
                 padding: EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -84,113 +89,76 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Campo de email
-                    TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        hintText: 'Correo electrónico',
-                        prefixIcon: Icon(
-                          Icons.email_outlined,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: 16),
-
-                    // Campo de contraseña
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: !_isPasswordVisible,
-                      decoration: InputDecoration(
-                        hintText: 'Contraseña',
-                        prefixIcon: Icon(
-                          Icons.lock_outlined,
-                          color: AppColors.primary,
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: AppColors.textSecondary,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Botón de iniciar sesión
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MainNavigation(),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Iniciar Sesión',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: 16),
-
-                    // ¿Olvidaste tu contraseña?
-                    Center(
-                      child: TextButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Función de recuperación próximamente',
-                              ),
-                              backgroundColor: AppColors.info,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          '¿Olvidaste tu contraseña?',
-                          style: TextStyle(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_error != null) ...[
+                        Text(_error!, style: TextStyle(color: AppColors.error)),
+                        SizedBox(height: 12),
+                      ],
+                      // Email
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          hintText: 'Correo electrónico',
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
                             color: AppColors.primary,
-                            fontSize: 14,
+                          ),
+                        ),
+                        validator: (v) => v == null || !v.contains('@')
+                            ? 'Email inválido'
+                            : null,
+                      ),
+                      SizedBox(height: 16),
+                      // Contraseña
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: 'Contraseña',
+                          prefixIcon: Icon(
+                            Icons.lock_outlined,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        validator: (v) => v == null || v.isEmpty
+                            ? 'Ingresa tu contraseña'
+                            : null,
+                      ),
+                      SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _login,
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          backgroundColor: AppColors.primary,
+                        ),
+                        child: Text(
+                          'Iniciar Sesión',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-
               SizedBox(height: 32),
-
               // Enlace a registro
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '¿No tienes una cuenta? ',
+                    '¿No tienes cuenta? ',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -198,12 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => RegisterScreen(),
-                        ),
-                      );
+                      Navigator.pushNamed(context, '/register');
                     },
                     child: Text(
                       'Regístrate',
@@ -216,7 +179,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-
               SizedBox(height: 32),
             ],
           ),
