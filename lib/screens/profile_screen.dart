@@ -20,14 +20,11 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>
     with AutomaticKeepAliveClientMixin {
-  // Con AutomaticKeepAliveClientMixin nos aseguramos de que
-  // si usas IndexedStack en tu BottomNavigation, mantenga el estado.
   @override
   bool get wantKeepAlive => true;
 
   User? _user;
   final _formKey = GlobalKey<FormState>();
-
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
@@ -41,12 +38,38 @@ class _ProfileScreenState extends State<ProfileScreen>
   final ImagePicker _picker = ImagePicker();
 
   static const List<String> _avatars = [
-    '😊', '😎', '🤗', '😍', '🥳', '🤩', '😇', '🙂',
-    '💙', // nuevo corazón azul
-    '💪', '🏃‍♂️', '🏃‍♀️', '🚴‍♂️', '🚴‍♀️',
-    '🏋️‍♂️', '🏋️‍♀️', '⚽', '🏀', '🎾', '🏐',
-    '🏈', '⚾', '🥎', '🏓', '🔥', '⭐', '🌟',
-    '💎', '🏆', '🥇', '🎯', '💯',
+    '😊',
+    '😎',
+    '🤗',
+    '😍',
+    '🥳',
+    '🤩',
+    '😇',
+    '🙂',
+    '💙',
+    '💪',
+    '🏃‍♂️',
+    '🏃‍♀️',
+    '🚴‍♂️',
+    '🚴‍♀️',
+    '🏋️‍♂️',
+    '🏋️‍♀️',
+    '⚽',
+    '🏀',
+    '🎾',
+    '🏐',
+    '🏈',
+    '⚾',
+    '🥎',
+    '🏓',
+    '🔥',
+    '⭐',
+    '🌟',
+    '💎',
+    '🏆',
+    '🥇',
+    '🎯',
+    '💯',
   ];
 
   @override
@@ -59,22 +82,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     _heightCtrl = TextEditingController();
     _weightCtrl = TextEditingController();
 
-    // Siempre recargamos del SharedPreferences
+    // Cargar datos al arrancar
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfileData());
   }
 
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     try {
-      // Primero cargamos del almacenamiento persistente.
+      // 1) cargar usuario
       final saved = await UserPrefs.loadCurrentUser();
       if (saved == null) return _redirectToLogin();
-      // Sincronizamos también el provider.
+      // sincronizar provider
       // ignore: use_build_context_synchronously
       Provider.of<AuthProvider>(context, listen: false).setUser(saved);
       _user = saved;
 
-      // Rellenar los campos
+      // 2) rellenar campos
       _nameCtrl.text = _user!.name;
       _emailCtrl.text = _user!.email;
       _phoneCtrl.text = _user!.phone ?? '';
@@ -82,17 +105,27 @@ class _ProfileScreenState extends State<ProfileScreen>
       _heightCtrl.text = _user!.height?.toString() ?? '';
       _weightCtrl.text = _user!.weight?.toString() ?? '';
 
-      // Cargar avatarUrl
-      final av = _user!.avatarUrl ?? '';
-      if (av.startsWith('avatar:')) {
-        _selectedAvatar = av.substring(7);
-        _profileImage = null;
-      } else if (av.isNotEmpty && File(av).existsSync()) {
-        _profileImage = File(av);
-        _selectedAvatar = null;
+      // 3) cargar avatarImage / emoji
+      // primero intento de SharedPrefs profile_image
+      final imgData = await UserPrefs.getProfileImage();
+      if (imgData != null && imgData.isNotEmpty) {
+        if (imgData.startsWith('avatar:')) {
+          _selectedAvatar = imgData.substring(7);
+          _profileImage = null;
+        } else if (File(imgData).existsSync()) {
+          _profileImage = File(imgData);
+          _selectedAvatar = null;
+        }
       } else {
-        _selectedAvatar = null;
-        _profileImage = null;
+        // si no hay en profile_image, usar avatarUrl del usuario
+        final av = _user!.avatarUrl ?? '';
+        if (av.startsWith('avatar:')) {
+          _selectedAvatar = av.substring(7);
+          _profileImage = null;
+        } else if (av.isNotEmpty && File(av).existsSync()) {
+          _profileImage = File(av);
+          _selectedAvatar = null;
+        }
       }
     } catch (e) {
       _showErrorSnackbar('Error al cargar perfil');
@@ -144,10 +177,14 @@ class _ProfileScreenState extends State<ProfileScreen>
       newAvatarUrl = _profileImage!.path;
     }
 
+    // 1) actualizar en UserPrefs.users_list
     final updated = _user!.copyWith(avatarUrl: newAvatarUrl);
     await UserPrefs.saveUser(updated);
     // ignore: use_build_context_synchronously
     Provider.of<AuthProvider>(context, listen: false).setUser(updated);
+
+    // 2) también guardo en la clave profile_image
+    await UserPrefs.saveProfileImage(newAvatarUrl);
 
     setState(() {
       _user = updated;
@@ -164,10 +201,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     // ignore: use_build_context_synchronously
     Provider.of<AuthProvider>(context, listen: false).setUser(updated);
 
+    // limpio clave profile_image también
+    await UserPrefs.clearProfileImage();
+
     setState(() {
       _user = updated;
-      _selectedAvatar = null;
       _profileImage = null;
+      _selectedAvatar = null;
       _isLoading = false;
     });
   }
@@ -189,9 +229,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         avatarUrl: currentAv,
       );
 
+      // actualizar lista de usuarios
       await UserPrefs.saveUser(updated);
       // ignore: use_build_context_synchronously
       Provider.of<AuthProvider>(context, listen: false).setUser(updated);
+
+      // la imagen/emoji ya está en profile_image de antes,
+      // así que no hace falta volver a guardarla aquí.
 
       setState(() => _user = updated);
       _showSuccessSnackbar('Perfil actualizado');
@@ -249,6 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildAvatarCircle() {
+    super.build(context); // para AutomaticKeepAliveClientMixin
     const radius = 60.0;
     // ignore: deprecated_member_use
     final bg = AppColors.primary.withOpacity(0.1);
@@ -276,7 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // por AutomaticKeepAliveClientMixin
+    super.build(context);
     if (_isLoading || _user == null) {
       return Scaffold(
         backgroundColor: AppColors.background,

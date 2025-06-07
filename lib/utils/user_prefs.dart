@@ -121,4 +121,8 @@ class UserPrefs {
   }
 
   static Future getProfileImage() async {}
+
+  static Future<void> saveProfileImage(String newAvatarUrl) async {}
+
+  static Future<void> clearProfileImage() async {}
 }
