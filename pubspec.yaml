@@ -28,6 +28,7 @@ dependencies:
   
   # Utilities
   intl: ^0.20.2
+  uuid: ^3.0.6      # <— Agregado para generar IDs únicos en los posts
 
 dev_dependencies:
   flutter_test:

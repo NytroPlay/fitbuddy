@@ -8,7 +8,7 @@ class CommunityPrefs {
   static Future<void> savePosts(List<Post> posts) async {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = posts.map((p) => p.toJson()).toList();
-    prefs.setString(_key, jsonEncode(jsonList));
+    await prefs.setString(_key, jsonEncode(jsonList));
   }
 
   static Future<List<Post>> loadPosts() async {
@@ -16,6 +16,10 @@ class CommunityPrefs {
     final data = prefs.getString(_key);
     if (data == null) return [];
     final List<dynamic> jsonList = jsonDecode(data);
-    return jsonList.map((j) => Post.fromJson(j)).toList();
+    // Robustez: asegurarse que cada elemento es Map antes de pasar a fromJson
+    return jsonList
+        .whereType<Map<String, dynamic>>()
+        .map((j) => Post.fromJson(j))
+        .toList();
   }
 }

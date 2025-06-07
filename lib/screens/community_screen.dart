@@ -1,6 +1,8 @@
 // lib/screens/community_screen.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../utils/app_theme.dart';
 import '../models/post.dart';
 import '../utils/community_prefs.dart';
@@ -20,60 +22,17 @@ class _CommunityScreenState extends State<CommunityScreen>
   List<Post> _posts = [];
   List<String> _joinedGroups = [];
   String? _userName;
-
-  // Datos predeterminados
-  final List<Post> _defaultPosts = [
-    Post(
-      userName: 'María González',
-      content:
-          '¡Acabo de completar mi rutina de cardio! 🔥 30 minutos de HIIT y me siento increíble. ¿Quién más se anima hoy?',
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-    ),
-    Post(
-      userName: 'Carlos Ruiz',
-      content:
-          'Nuevo récord personal en peso muerto: 120kg! 💪 El trabajo duro siempre da frutos.',
-      date: DateTime.now().subtract(const Duration(hours: 4)),
-    ),
-    Post(
-      userName: 'Ana Martín',
-      content:
-          'Día de yoga y meditación. A veces el descanso activo es lo que más necesitamos 🧘‍♀️',
-      date: DateTime.now().subtract(const Duration(hours: 6)),
-    ),
-  ];
-
-  final List<Map<String, dynamic>> _groups = [
-    {
-      'name': 'Runners FitBuddy',
-      'description': 'Grupo para amantes del running',
-      'icon': Icons.directions_run,
-      'color': AppColors.primary,
-    },
-    {
-      'name': 'Fuerza y Músculo',
-      'description': 'Entrenamientos de fuerza y hipertrofia',
-      'icon': Icons.fitness_center,
-      'color': AppColors.error,
-    },
-    {
-      'name': 'Yoga y Mindfulness',
-      'description': 'Bienestar mental y físico',
-      'icon': Icons.self_improvement,
-      'color': AppColors.success,
-    },
-    {
-      'name': 'Principiantes',
-      'description': 'Para quienes están empezando',
-      'icon': Icons.school,
-      'color': AppColors.warning,
-    },
-  ];
+  String? _userAvatar;
+  String? _userEmail;
+  int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 3, vsync: this)
+      ..addListener(() {
+        setState(() => _selectedTab = _tabController.index);
+      });
     _loadUser();
     _loadPosts();
     _loadGroups();
@@ -81,8 +40,11 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   Future<void> _loadUser() async {
     final user = await UserPrefs.loadUser();
+    final avatar = await UserPrefs.getProfileImage();
     setState(() {
       _userName = user?.name ?? 'Tú';
+      _userAvatar = avatar;
+      _userEmail = user?.email;
     });
   }
 
@@ -97,23 +59,41 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   Future<void> _addPost(String content, {String? group}) async {
     if (_userName == null) return;
+    final now = DateTime.now();
+    // Previene spam de doble post muy rápido
+    if (_posts.isNotEmpty &&
+        _posts.first.content == content &&
+        now.difference(_posts.first.date).inSeconds < 2) {
+      return;
+    }
     final post = Post(
       userName: _userName!,
       content: content,
-      date: DateTime.now(),
+      date: now,
       group: group,
+      avatar: _userAvatar,
+      email: _userEmail,
+      likes: 0,
+      liked: false,
+      comments: [],
     );
     setState(() => _posts.insert(0, post));
     await _savePosts();
   }
 
   Future<void> _editPost(int index, String newContent) async {
+    final original = _posts[index];
     setState(() {
       _posts[index] = Post(
-        userName: _posts[index].userName,
+        userName: original.userName,
         content: newContent,
         date: DateTime.now(),
-        group: _posts[index].group,
+        group: original.group,
+        avatar: original.avatar,
+        email: original.email,
+        likes: original.likes,
+        liked: original.liked,
+        comments: List.from(original.comments),
       );
     });
     await _savePosts();
@@ -136,47 +116,46 @@ class _CommunityScreenState extends State<CommunityScreen>
     }
   }
 
-  void _showCreatePostDialog({String? group}) {
-    final contentController = TextEditingController();
+  void _showCreatePostDialog() {
+    final ctrl = TextEditingController();
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.create, color: AppColors.primary),
+            Icon(Icons.edit, color: AppColors.primary),
             const SizedBox(width: 8),
-            Text('Crear Post', style: TextStyle(color: AppColors.primary)),
+            Text(
+              'Crear Post',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
           ],
         ),
         content: TextField(
-          controller: contentController,
+          controller: ctrl,
           maxLines: 4,
           decoration: InputDecoration(
             hintText: '¿Qué quieres compartir?',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary),
-            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'Cancelar',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: AppColors.error)),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (contentController.text.isNotEmpty) {
-                await _addPost(contentController.text, group: group);
-                // ignore: use_build_context_synchronously
-                Navigator.of(context).pop();
-                // ignore: use_build_context_synchronously
+              final text = ctrl.text.trim();
+              if (text.isNotEmpty) {
+                await _addPost(text);
+                if (!mounted) return;
+                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Post publicado exitosamente'),
@@ -187,7 +166,9 @@ class _CommunityScreenState extends State<CommunityScreen>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Publicar'),
           ),
@@ -196,44 +177,390 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  void _showEditPostDialog(int index) {
-    final contentController = TextEditingController(
-      text: _posts[index].content,
-    );
+  void _showEditDialog(int idx) {
+    final ctrl = TextEditingController(text: _posts[idx].content);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Editar publicación'),
+        backgroundColor: const Color(0xfff0f3ec),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Editar publicación',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        ),
         content: TextField(
-          controller: contentController,
+          controller: ctrl,
           maxLines: 4,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: AppColors.error)),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (contentController.text.isNotEmpty) {
-                await _editPost(index, contentController.text);
-                // ignore: use_build_context_synchronously
-                Navigator.of(context).pop();
+              final text = ctrl.text.trim();
+              if (text.isNotEmpty) {
+                await _editPost(idx, text);
+                if (!mounted) return;
+                Navigator.pop(context);
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             child: const Text('Guardar'),
           ),
           TextButton(
             onPressed: () async {
-              await _deletePost(index);
-              // ignore: use_build_context_synchronously
-              Navigator.of(context).pop();
+              await _deletePost(idx);
+              if (!mounted) return;
+              Navigator.pop(context);
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
+    );
+  }
+
+  void _showComments(int idx) {
+    final post = _posts[idx];
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Comentarios',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (post.comments.isNotEmpty)
+              SizedBox(
+                height: 120,
+                child: ListView.builder(
+                  itemCount: post.comments.length,
+                  itemBuilder: (_, i) => ListTile(
+                    leading: Icon(
+                      Icons.comment,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                    title: Text(post.comments[i]),
+                  ),
+                ),
+              )
+            else
+              const Text('Sin comentarios todavía.'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: ctrl,
+              decoration: InputDecoration(
+                hintText: 'Escribe un comentario...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cerrar', style: TextStyle(color: AppColors.error)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final txt = ctrl.text.trim();
+              if (txt.isNotEmpty) {
+                setState(() => post.comments.add(txt));
+                await _savePosts();
+                if (!mounted) return;
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Comentar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(Post p) {
+    if (p.avatar != null && p.avatar!.isNotEmpty) {
+      if (p.avatar!.startsWith('avatar:')) {
+        return CircleAvatar(
+          backgroundColor: AppColors.primary,
+          child: Text(
+            p.avatar!.substring(7),
+            style: const TextStyle(fontSize: 24),
+          ),
+        );
+      }
+      if (File(p.avatar!).existsSync()) {
+        return CircleAvatar(
+          backgroundColor: AppColors.primary,
+          backgroundImage: FileImage(File(p.avatar!)),
+        );
+      }
+    }
+    return CircleAvatar(
+      backgroundColor: AppColors.primary,
+      child: const Icon(Icons.fitness_center, color: Colors.white),
+    );
+  }
+
+  Widget _buildFeedTab() {
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _loadPosts,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: _posts.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, i) {
+          final p = _posts[i];
+          final mine = p.email == _userEmail;
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xfff6f9f6),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.06),
+                  blurRadius: 6,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _buildAvatar(p),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        p.userName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Text(
+                      DateFormat('d/M/yyyy H:mm').format(p.date),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                    if (mine)
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 20),
+                        onSelected: (v) =>
+                            v == 'edit' ? _showEditDialog(i) : _deletePost(i),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Editar')),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Eliminar'),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(p.content),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (!p.liked) {
+                            p.likes += 1;
+                            p.liked = true;
+                          }
+                        });
+                      },
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.favorite,
+                            color: p.likes > 0 ? Colors.red : Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text('${p.likes}'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: () => _showComments(i),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text('${p.comments.length}'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardTab() {
+    final lb = [
+      {'name': 'Carlos Ruiz', 'pts': 1250},
+      {'name': 'María González', 'pts': 1180},
+      {'name': 'Ana Martín', 'pts': 1050},
+      {'name': 'Luis Torres', 'pts': 980},
+      {'name': 'Sofia López', 'pts': 920},
+    ];
+    final medals = [
+      const Color(0xFFF4C542),
+      const Color(0xFFB0B7C3),
+      const Color(0xFFE27B36),
+      AppColors.primary,
+      AppColors.primary.withOpacity(0.8),
+    ];
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: lb.length,
+      itemBuilder: (_, i) {
+        final u = lb[i];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: medals[i], width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: medals[i].withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: medals[i],
+              child: Text(
+                (u['name'] as String)[0],
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            title: Text(
+              u['name'] as String,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            trailing: Text(
+              '${u['pts']} pts',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupsTab() {
+    final groups = [
+      {
+        'name': 'Runners FitBuddy',
+        'desc': 'Para amantes del running',
+        'icon': Icons.directions_run,
+        'color': AppColors.primary,
+      },
+      {
+        'name': 'Fuerza y Músculo',
+        'desc': 'Entrenamientos de fuerza',
+        'icon': Icons.fitness_center,
+        'color': AppColors.error,
+      },
+      {
+        'name': 'Yoga y Mindfulness',
+        'desc': 'Bienestar mental y físico',
+        'icon': Icons.self_improvement,
+        'color': AppColors.success,
+      },
+      {
+        'name': 'Principiantes',
+        'desc': 'Iniciando tu viaje',
+        'icon': Icons.school,
+        'color': AppColors.warning,
+      },
+    ];
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: groups.length,
+      itemBuilder: (_, i) {
+        final g = groups[i];
+        final joined = _joinedGroups.contains(g['name']);
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: g['color'] as Color,
+              child: Icon(g['icon'] as IconData, color: Colors.white),
+            ),
+            title: Text(g['name'] as String),
+            subtitle: Text(g['desc'] as String),
+            trailing: ElevatedButton(
+              onPressed: () {
+                if (!joined) {
+                  _joinGroup(g['name'] as String);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupPostsScreen(
+                        groupName: g['name'] as String,
+                        userName: _userName!,
+                        posts: _posts,
+                        onAddPost: (c) async {
+                          await _addPost(c, group: g['name'] as String);
+                        },
+                      ),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: joined
+                    ? AppColors.primary
+                    : AppColors.primary.withOpacity(0.7),
+              ),
+              child: Text(joined ? 'Entrar' : 'Unirse'),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -244,13 +571,11 @@ class _CommunityScreenState extends State<CommunityScreen>
       appBar: AppBar(
         title: const Text('Comunidad'),
         backgroundColor: AppColors.primary,
-        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
-          // ignore: deprecated_member_use
-          unselectedLabelColor: Colors.white.withOpacity(0.7),
+          unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(text: 'Feed'),
             Tab(text: 'Ranking'),
@@ -262,175 +587,18 @@ class _CommunityScreenState extends State<CommunityScreen>
         controller: _tabController,
         children: [_buildFeedTab(), _buildLeaderboardTab(), _buildGroupsTab()],
       ),
-      floatingActionButton: _tabController.index == 0
+      floatingActionButton: _selectedTab == 0
           ? FloatingActionButton(
               onPressed: _showCreatePostDialog,
               backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
               child: const Icon(Icons.add),
             )
           : null,
     );
   }
-
-  Widget _buildFeedTab() {
-    final feedPosts = [
-      ..._defaultPosts,
-      ..._posts.where((p) => p.group == null),
-    ];
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: _loadPosts,
-      child: feedPosts.isEmpty
-          ? const Center(child: Text('No hay publicaciones aún.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: feedPosts.length,
-              itemBuilder: (_, i) {
-                final post = feedPosts[i];
-                final isMine = post.userName == _userName;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.primary,
-                      child: Text(
-                        post.userName.isNotEmpty ? post.userName[0] : '?',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    title: Text(post.userName),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(post.content),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${post.date.day}/${post.date.month}/${post.date.year} '
-                          '${post.date.hour}:${post.date.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: isMine
-                        ? PopupMenuButton<String>(
-                            onSelected: (v) {
-                              if (v == 'edit') {
-                                final idx = _posts.indexWhere((p) => p == post);
-                                if (idx != -1) _showEditPostDialog(idx);
-                              }
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Editar / Eliminar'),
-                              ),
-                            ],
-                          )
-                        : null,
-                  ),
-                );
-              },
-            ),
-    );
-  }
-
-  Widget _buildLeaderboardTab() {
-    final leaderboard = [
-      {'name': 'Carlos Ruiz', 'points': 1250},
-      {'name': 'María González', 'points': 1180},
-      {'name': 'Ana Martín', 'points': 1050},
-      {'name': 'Luis Torres', 'points': 980},
-      {'name': 'Sofia López', 'points': 920},
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: leaderboard.length,
-      itemBuilder: (_, i) {
-        final user = leaderboard[i];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppColors.primary,
-            child: Text(user['name']![0]),
-          ),
-          title: Text(user['name'] as String),
-          trailing: Text(
-            '${user['points']} pts',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildGroupsTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _groups.length,
-      itemBuilder: (_, i) {
-        final group = _groups[i];
-        final joined = _joinedGroups.contains(group['name']);
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: group['color'],
-              child: Icon(group['icon'], color: Colors.white),
-            ),
-            title: Text(group['name']),
-            subtitle: Text(group['description']),
-            trailing: joined
-                ? ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => GroupPostsScreen(
-                            groupName: group['name'],
-                            userName: _userName ?? 'Tú',
-                            posts: _posts,
-                            onAddPost: (content) async {
-                              await _addPost(content, group: group['name']);
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text('Entrar'),
-                  )
-                : ElevatedButton(
-                    onPressed: () async {
-                      await _joinGroup(group['name']);
-                      setState(() {});
-                      // ignore: use_build_context_synchronously
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Te has unido a ${group['name']}'),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                    },
-                    child: const Text('Unirse'),
-                  ),
-          ),
-        );
-      },
-    );
-  }
 }
 
-extension on Object? {
-  String operator [](int other) {
-    throw UnimplementedError('This operator is not implemented.');
-  }
-}
-
-// ------------------------------
-// Pantalla de posts por grupo
-// ------------------------------
+/// Pantalla de posts de un grupo (igual que la original)
 class GroupPostsScreen extends StatefulWidget {
   final String groupName;
   final String userName;
@@ -455,6 +623,7 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
     final groupPosts = widget.posts
         .where((p) => p.group == widget.groupName)
         .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.groupName),
@@ -463,48 +632,35 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
       body: groupPosts.isEmpty
           ? const Center(child: Text('No hay publicaciones en este grupo.'))
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               itemCount: groupPosts.length,
               itemBuilder: (_, i) {
-                final post = groupPosts[i];
+                final p = groupPosts[i];
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primary,
-                      child: Text(
-                        post.userName.isNotEmpty ? post.userName[0] : '?',
+                      child: const Icon(
+                        Icons.fitness_center,
+                        color: Colors.white,
                       ),
                     ),
-                    title: Text(post.userName),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(post.content),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${post.date.day}/${post.date.month}/${post.date.year} '
-                          '${post.date.hour}:${post.date.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
+                    title: Text(p.userName),
+                    subtitle: Text(p.content),
                   ),
                 );
               },
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final controller = TextEditingController();
+          final ctrl = TextEditingController();
           await showDialog(
             context: context,
             builder: (_) => AlertDialog(
               title: const Text('Nueva publicación'),
               content: TextField(
-                controller: controller,
+                controller: ctrl,
                 maxLines: 4,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
@@ -518,11 +674,10 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    if (controller.text.isNotEmpty) {
-                      await widget.onAddPost(controller.text);
-                      // ignore: use_build_context_synchronously
+                    final txt = ctrl.text.trim();
+                    if (txt.isNotEmpty) {
+                      await widget.onAddPost(txt);
                       Navigator.pop(context);
-                      setState(() {});
                     }
                   },
                   child: const Text('Publicar'),
@@ -530,7 +685,6 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
               ],
             ),
           );
-          setState(() {});
         },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add),
