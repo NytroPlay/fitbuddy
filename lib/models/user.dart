@@ -1,3 +1,5 @@
+// lib/models/user.dart
+
 class User {
   final String id;
   final String name;
@@ -8,7 +10,7 @@ class User {
   final double? height;
   final double? weight;
   final DateTime? createdAt;
-  final String? avatarUrl;
+  final String? avatar; // ← ahora genérico (URL o "avatar:😃")
 
   User({
     required this.id,
@@ -20,16 +22,18 @@ class User {
     this.height,
     this.weight,
     this.createdAt,
-    this.avatarUrl,
+    this.avatar,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // si el backend usa "avatarUrl" o tu prefs usan "avatar", lo recogemos
+    final av = json['avatar'] as String? ?? json['avatarUrl'] as String?;
     return User(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       password: json['password'] ?? '',
-      phone: json['phone'],
+      phone: json['phone'] as String?,
       age: json['age'] != null ? int.tryParse(json['age'].toString()) : null,
       height: json['height'] != null
           ? double.tryParse(json['height'].toString())
@@ -38,14 +42,16 @@ class User {
           ? double.tryParse(json['weight'].toString())
           : null,
       createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'])
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
-      avatarUrl: json['avatarUrl'],
+      avatar: av,
     );
   }
 
+  get avatarUrl => null;
+
   Map<String, dynamic> toJson() {
-    return {
+    final m = <String, dynamic>{
       'id': id,
       'name': name,
       'email': email,
@@ -55,8 +61,12 @@ class User {
       'height': height,
       'weight': weight,
       'createdAt': createdAt?.toIso8601String(),
-      'avatarUrl': avatarUrl,
     };
+    // guardamos bajo "avatar" para que tus prefs y UI lo lean directamente
+    if (avatar != null) {
+      m['avatar'] = avatar;
+    }
+    return m;
   }
 
   User copyWith({
@@ -69,7 +79,8 @@ class User {
     double? height,
     double? weight,
     DateTime? createdAt,
-    String? avatarUrl,
+    String? avatar,
+    required String avatarUrl,
   }) {
     return User(
       id: id ?? this.id,
@@ -81,7 +92,7 @@ class User {
       height: height ?? this.height,
       weight: weight ?? this.weight,
       createdAt: createdAt ?? this.createdAt,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatar: avatar ?? this.avatar,
     );
   }
 }

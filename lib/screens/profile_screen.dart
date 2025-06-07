@@ -1,3 +1,5 @@
+// lib/screens/profile_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,9 +18,16 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with AutomaticKeepAliveClientMixin {
+  // Con AutomaticKeepAliveClientMixin nos aseguramos de que
+  // si usas IndexedStack en tu BottomNavigation, mantenga el estado.
+  @override
+  bool get wantKeepAlive => true;
+
   User? _user;
   final _formKey = GlobalKey<FormState>();
+
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
@@ -32,65 +41,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _picker = ImagePicker();
 
   static const List<String> _avatars = [
-    '😊',
-    '😎',
-    '🤗',
-    '😍',
-    '🥳',
-    '🤩',
-    '😇',
-    '🙂',
-    '💪',
-    '🏃‍♂️',
-    '🏃‍♀️',
-    '🚴‍♂️',
-    '🚴‍♀️',
-    '🏋️‍♂️',
-    '🏋️‍♀️',
-    '🤸‍♂️',
-    '⚽',
-    '🏀',
-    '🎾',
-    '🏐',
-    '🏈',
-    '⚾',
-    '🥎',
-    '🏓',
-    '🔥',
-    '⭐',
-    '🌟',
-    '💎',
-    '🏆',
-    '🥇',
-    '🎯',
-    '💯',
+    '😊', '😎', '🤗', '😍', '🥳', '🤩', '😇', '🙂',
+    '💙', // nuevo corazón azul
+    '💪', '🏃‍♂️', '🏃‍♀️', '🚴‍♂️', '🚴‍♀️',
+    '🏋️‍♂️', '🏋️‍♀️', '⚽', '🏀', '🎾', '🏐',
+    '🏈', '⚾', '🥎', '🏓', '🔥', '⭐', '🌟',
+    '💎', '🏆', '🥇', '🎯', '💯',
   ];
 
   @override
   void initState() {
     super.initState();
-    _initializeControllers();
-    _loadProfileData();
-  }
-
-  void _initializeControllers() {
     _nameCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
     _phoneCtrl = TextEditingController();
     _ageCtrl = TextEditingController();
     _heightCtrl = TextEditingController();
     _weightCtrl = TextEditingController();
+
+    // Siempre recargamos del SharedPreferences
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfileData());
   }
 
   Future<void> _loadProfileData() async {
-    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // Primero tratamos de cargar del provider
-      final authProv = Provider.of<AuthProvider>(context, listen: false);
-      _user = authProv.currentUser ?? await UserPrefs.loadUser();
-      if (_user == null) return _redirectToLogin();
+      // Primero cargamos del almacenamiento persistente.
+      final saved = await UserPrefs.loadCurrentUser();
+      if (saved == null) return _redirectToLogin();
+      // Sincronizamos también el provider.
+      // ignore: use_build_context_synchronously
+      Provider.of<AuthProvider>(context, listen: false).setUser(saved);
+      _user = saved;
 
+      // Rellenar los campos
       _nameCtrl.text = _user!.name;
       _emailCtrl.text = _user!.email;
       _phoneCtrl.text = _user!.phone ?? '';
@@ -98,16 +82,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _heightCtrl.text = _user!.height?.toString() ?? '';
       _weightCtrl.text = _user!.weight?.toString() ?? '';
 
-      final imgData = await UserPrefs.getProfileImage();
-      if (imgData != null && imgData.isNotEmpty) {
-        if (imgData.startsWith('avatar:')) {
-          _selectedAvatar = imgData.substring(7);
-        } else {
-          _profileImage = File(imgData);
-        }
+      // Cargar avatarUrl
+      final av = _user!.avatarUrl ?? '';
+      if (av.startsWith('avatar:')) {
+        _selectedAvatar = av.substring(7);
+        _profileImage = null;
+      } else if (av.isNotEmpty && File(av).existsSync()) {
+        _profileImage = File(av);
+        _selectedAvatar = null;
+      } else {
+        _selectedAvatar = null;
+        _profileImage = null;
       }
     } catch (e) {
-      debugPrint('Error loading profile: $e');
       _showErrorSnackbar('Error al cargar perfil');
       _redirectToLogin();
     } finally {
@@ -116,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _redirectToLogin() {
-    Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   @override
@@ -138,54 +125,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
       imageQuality: 80,
     );
     if (file != null) {
-      await _updateProfileImage(File(file.path));
+      await _updateAvatar(File(file.path), isEmoji: false);
     }
   }
 
-  Future<void> _updateProfileImage(File image) async {
-    setState(() {
-      _profileImage = image;
+  Future<void> _updateAvatar(Object data, {required bool isEmoji}) async {
+    if (_user == null) return;
+    setState(() => _isLoading = true);
+
+    String newAvatarUrl;
+    if (isEmoji) {
+      _selectedAvatar = data as String;
+      _profileImage = null;
+      newAvatarUrl = 'avatar:$_selectedAvatar';
+    } else {
+      _profileImage = data as File;
       _selectedAvatar = null;
+      newAvatarUrl = _profileImage!.path;
+    }
+
+    final updated = _user!.copyWith(avatarUrl: newAvatarUrl);
+    await UserPrefs.saveUser(updated);
+    // ignore: use_build_context_synchronously
+    Provider.of<AuthProvider>(context, listen: false).setUser(updated);
+
+    setState(() {
+      _user = updated;
+      _isLoading = false;
     });
-    await UserPrefs.saveProfileImage(image.path);
   }
 
-  Future<void> _clearProfileImage() async {
-    await UserPrefs.clearProfileImage();
-    if (!mounted) return;
+  Future<void> _clearAvatar() async {
+    if (_user == null) return;
+    setState(() => _isLoading = true);
+
+    final updated = _user!.copyWith(avatarUrl: '');
+    await UserPrefs.saveUser(updated);
+    // ignore: use_build_context_synchronously
+    Provider.of<AuthProvider>(context, listen: false).setUser(updated);
+
     setState(() {
-      _profileImage = null;
+      _user = updated;
       _selectedAvatar = null;
+      _profileImage = null;
+      _isLoading = false;
     });
   }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _user == null) return;
     setState(() => _isLoading = true);
 
     try {
-      final updated = User(
-        id: _user!.id,
+      final currentAv = _user!.avatarUrl ?? '';
+      final updated = _user!.copyWith(
         name: _nameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
-        password: _user!.password,
         phone: _phoneCtrl.text.trim().isNotEmpty
             ? _phoneCtrl.text.trim()
             : null,
         age: int.tryParse(_ageCtrl.text.trim()),
         height: double.tryParse(_heightCtrl.text.trim()),
         weight: double.tryParse(_weightCtrl.text.trim()),
-        createdAt: _user!.createdAt,
-        avatarUrl: _selectedAvatar,
+        avatarUrl: currentAv,
       );
 
       await UserPrefs.saveUser(updated);
       // ignore: use_build_context_synchronously
       Provider.of<AuthProvider>(context, listen: false).setUser(updated);
 
-      if (!mounted) return;
       setState(() => _user = updated);
-      _showSuccessSnackbar('Perfil actualizado correctamente');
+      _showSuccessSnackbar('Perfil actualizado');
     } catch (e) {
       _showErrorSnackbar('Error al guardar: $e');
     } finally {
@@ -215,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // ignore: use_build_context_synchronously
       await Provider.of<AuthProvider>(context, listen: false).logout();
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
     }
   }
 
@@ -239,11 +248,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileAvatar() {
+  Widget _buildAvatarCircle() {
     const radius = 60.0;
     // ignore: deprecated_member_use
     final bg = AppColors.primary.withOpacity(0.1);
-    if (_selectedAvatar != null) {
+
+    if (_selectedAvatar != null && _selectedAvatar!.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
         backgroundColor: bg,
@@ -260,12 +270,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return CircleAvatar(
       radius: radius,
       backgroundColor: bg,
-      child: Icon(Icons.person, size: 60, color: AppColors.primary),
+      child: Icon(Icons.person, color: AppColors.primary, size: 60),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // por AutomaticKeepAliveClientMixin
     if (_isLoading || _user == null) {
       return Scaffold(
         backgroundColor: AppColors.background,
@@ -294,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: _showImagePickerOptions,
                   child: Stack(
                     children: [
-                      _buildProfileAvatar(),
+                      _buildAvatarCircle(),
                       Positioned(
                         bottom: 0,
                         right: 0,
@@ -307,8 +318,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           child: const Icon(
                             Icons.edit,
-                            size: 20,
                             color: Colors.white,
+                            size: 20,
                           ),
                         ),
                       ),
@@ -370,7 +381,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _saveProfile,
+                  onPressed: _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(
@@ -381,16 +392,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Guardar Cambios',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                  child: const Text(
+                    'Guardar Cambios',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: _isLoading ? null : _logout,
+                  onPressed: _logout,
                   child: const Text(
                     'Cerrar Sesión',
                     style: TextStyle(color: AppColors.error),
@@ -436,42 +445,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Container(
+      builder: (_) => Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Text(
-              'Seleccionar foto de perfil',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
+            _pickerOption(
+              Icons.camera_alt,
+              'Cámara',
+              () => _pickImage(ImageSource.camera),
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _pickerOption(
-                  Icons.camera_alt,
-                  'Cámara',
-                  () => _pickImage(ImageSource.camera),
-                ),
-                _pickerOption(
-                  Icons.photo_library,
-                  'Galería',
-                  () => _pickImage(ImageSource.gallery),
-                ),
-                _pickerOption(
-                  Icons.emoji_emotions,
-                  'Avatar',
-                  _showAvatarPicker,
-                ),
-                if (_profileImage != null || _selectedAvatar != null)
-                  _pickerOption(Icons.delete, 'Eliminar', _clearProfileImage),
-              ],
+            _pickerOption(
+              Icons.photo_library,
+              'Galería',
+              () => _pickImage(ImageSource.gallery),
             ),
+            _pickerOption(Icons.emoji_emotions, 'Avatar', _showAvatarPicker),
+            if (_profileImage != null || _selectedAvatar != null)
+              _pickerOption(Icons.delete, 'Eliminar', _clearAvatar),
           ],
         ),
       ),
@@ -479,14 +470,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _pickerOption(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pop(context);
-        onTap();
-      },
-      child: Column(
-        children: [
-          Container(
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            Navigator.pop(context);
+            onTap();
+          },
+          child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               // ignore: deprecated_member_use
@@ -495,16 +486,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Icon(icon, size: 32, color: AppColors.primary),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 
@@ -526,23 +514,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisSpacing: 8,
             ),
             itemCount: _avatars.length,
-            itemBuilder: (c, i) {
+            itemBuilder: (_, i) {
               final av = _avatars[i];
+              final isSel = _selectedAvatar == av;
               return GestureDetector(
-                onTap: () async {
-                  setState(() => _selectedAvatar = av);
-                  await UserPrefs.saveProfileImage('avatar:$av');
-                  if (mounted) Navigator.pop(context);
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateAvatar(av, isEmoji: true);
                 },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: _selectedAvatar == av
+                    color: isSel
                         // ignore: deprecated_member_use
                         ? AppColors.primary.withOpacity(0.2)
                         // ignore: deprecated_member_use
                         : Colors.grey.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: _selectedAvatar == av
+                    border: isSel
                         ? Border.all(color: AppColors.primary, width: 2)
                         : null,
                   ),
