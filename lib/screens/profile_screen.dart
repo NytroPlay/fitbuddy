@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
+import '../auth/auth_provider.dart';
 import '../models/user.dart';
 import '../utils/user_prefs.dart';
 import '../utils/app_theme.dart';
+import '../utils/validators.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,19 +19,18 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   User? _user;
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameCtrl;
-  late TextEditingController _emailCtrl;
-  late TextEditingController _phoneCtrl;
-  late TextEditingController _ageCtrl;
-  late TextEditingController _heightCtrl;
-  late TextEditingController _weightCtrl;
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _emailCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _ageCtrl;
+  late final TextEditingController _heightCtrl;
+  late final TextEditingController _weightCtrl;
 
   File? _profileImage;
   String? _selectedAvatar;
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
 
-  // Lista de avatares/emojis disponibles
   static const List<String> _avatars = [
     '😊',
     '😎',
@@ -80,34 +83,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      _user = await UserPrefs.loadUser();
-      if (_user != null) {
-        _nameCtrl.text = _user!.name;
-        _emailCtrl.text = _user!.email;
-        _phoneCtrl.text = _user!.phone ?? '';
-        _ageCtrl.text = _user!.age?.toString() ?? '';
-        _heightCtrl.text = _user!.height?.toString() ?? '';
-        _weightCtrl.text = _user!.weight?.toString() ?? '';
+      // Primero tratamos de cargar del provider
+      final authProv = Provider.of<AuthProvider>(context, listen: false);
+      _user = authProv.currentUser ?? await UserPrefs.loadUser();
+      if (_user == null) return _redirectToLogin();
 
-        // Cargar imagen/avatar
-        final prefsData = await UserPrefs.getProfileImage();
-        if (prefsData != null) {
-          if (prefsData.startsWith('avatar:')) {
-            _selectedAvatar = prefsData.replaceFirst('avatar:', '');
-          } else {
-            _profileImage = File(prefsData);
-          }
+      _nameCtrl.text = _user!.name;
+      _emailCtrl.text = _user!.email;
+      _phoneCtrl.text = _user!.phone ?? '';
+      _ageCtrl.text = _user!.age?.toString() ?? '';
+      _heightCtrl.text = _user!.height?.toString() ?? '';
+      _weightCtrl.text = _user!.weight?.toString() ?? '';
+
+      final imgData = await UserPrefs.getProfileImage();
+      if (imgData != null && imgData.isNotEmpty) {
+        if (imgData.startsWith('avatar:')) {
+          _selectedAvatar = imgData.substring(7);
+        } else {
+          _profileImage = File(imgData);
         }
       }
     } catch (e) {
       debugPrint('Error loading profile: $e');
+      _showErrorSnackbar('Error al cargar perfil');
+      _redirectToLogin();
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _redirectToLogin() {
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
   }
 
   @override
@@ -121,89 +130,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 80,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _profileImage = File(pickedFile.path);
-          _selectedAvatar = null;
-        });
-        await UserPrefs.saveProfileImage(pickedFile.path);
-      }
-    } catch (e) {
-      _showErrorSnackbar('Error al seleccionar imagen: $e');
+  Future<void> _pickImage(ImageSource src) async {
+    final file = await _picker.pickImage(
+      source: src,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 80,
+    );
+    if (file != null) {
+      await _updateProfileImage(File(file.path));
     }
   }
 
-  void _showAvatarPicker() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Elige tu avatar',
-          style: TextStyle(color: AppColors.primary),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: GridView.builder(
-            shrinkWrap: true,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 6,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: _avatars.length,
-            itemBuilder: (context, index) {
-              final avatar = _avatars[index];
-              return GestureDetector(
-                onTap: () async {
-                  setState(() {
-                    _selectedAvatar = avatar;
-                    _profileImage = null;
-                  });
-                  await UserPrefs.saveProfileImage('avatar:$avatar');
-                  // ignore: use_build_context_synchronously
-                  if (mounted) Navigator.pop(context);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _selectedAvatar == avatar
-                        // ignore: deprecated_member_use
-                        ? AppColors.primary.withOpacity(0.2)
-                        // ignore: deprecated_member_use
-                        : Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: _selectedAvatar == avatar
-                        ? Border.all(color: AppColors.primary, width: 2)
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(avatar, style: const TextStyle(fontSize: 24)),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _updateProfileImage(File image) async {
+    setState(() {
+      _profileImage = image;
+      _selectedAvatar = null;
+    });
+    await UserPrefs.saveProfileImage(image.path);
   }
 
   Future<void> _clearProfileImage() async {
     await UserPrefs.clearProfileImage();
+    if (!mounted) return;
     setState(() {
       _profileImage = null;
       _selectedAvatar = null;
@@ -212,39 +161,273 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final updatedUser = User(
+      final updated = User(
+        id: _user!.id,
         name: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
-        password: _user!.password, // Mantener la contraseña existente
+        password: _user!.password,
         phone: _phoneCtrl.text.trim().isNotEmpty
             ? _phoneCtrl.text.trim()
             : null,
-        age: _ageCtrl.text.trim().isNotEmpty
-            ? int.parse(_ageCtrl.text.trim())
-            : null,
-        height: _heightCtrl.text.trim().isNotEmpty
-            ? double.parse(_heightCtrl.text.trim())
-            : null,
-        weight: _weightCtrl.text.trim().isNotEmpty
-            ? double.parse(_weightCtrl.text.trim())
-            : null,
+        age: int.tryParse(_ageCtrl.text.trim()),
+        height: double.tryParse(_heightCtrl.text.trim()),
+        weight: double.tryParse(_weightCtrl.text.trim()),
+        createdAt: _user!.createdAt,
+        avatarUrl: _selectedAvatar,
       );
 
-      await UserPrefs.saveUser(updatedUser);
-      setState(() => _user = updatedUser);
+      await UserPrefs.saveUser(updated);
+      // ignore: use_build_context_synchronously
+      Provider.of<AuthProvider>(context, listen: false).setUser(updated);
 
+      if (!mounted) return;
+      setState(() => _user = updated);
       _showSuccessSnackbar('Perfil actualizado correctamente');
     } catch (e) {
       _showErrorSnackbar('Error al guardar: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _logout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Seguro quieres cerrar sesión?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí, cerrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      // ignore: use_build_context_synchronously
+      await Provider.of<AuthProvider>(context, listen: false).logout();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+    }
+  }
+
+  void _showErrorSnackbar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccessSnackbar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    const radius = 60.0;
+    // ignore: deprecated_member_use
+    final bg = AppColors.primary.withOpacity(0.1);
+    if (_selectedAvatar != null) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: bg,
+        child: Text(_selectedAvatar!, style: const TextStyle(fontSize: 60)),
+      );
+    }
+    if (_profileImage != null) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: bg,
+        backgroundImage: FileImage(_profileImage!),
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: bg,
+      child: Icon(Icons.person, size: 60, color: AppColors.primary),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || _user == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Mi Perfil'),
+          backgroundColor: AppColors.primary,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Mi Perfil'),
+        backgroundColor: AppColors.primary,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _showImagePickerOptions,
+                  child: Stack(
+                    children: [
+                      _buildProfileAvatar(),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.edit,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                _buildTextField(
+                  'Nombre completo',
+                  _nameCtrl,
+                  Icons.person_outline,
+                  validator: Validators.validateName,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  'Email',
+                  _emailCtrl,
+                  Icons.email_outlined,
+                  enabled: false,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  'Teléfono (opc.)',
+                  _phoneCtrl,
+                  Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        'Edad (opc.)',
+                        _ageCtrl,
+                        Icons.cake_outlined,
+                        keyboardType: TextInputType.number,
+                        validator: Validators.validateAge,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildTextField(
+                        'Altura (cm)',
+                        _heightCtrl,
+                        Icons.height,
+                        keyboardType: TextInputType.number,
+                        validator: Validators.validateHeight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  'Peso (kg)',
+                  _weightCtrl,
+                  Icons.monitor_weight_outlined,
+                  keyboardType: TextInputType.number,
+                  validator: Validators.validateWeight,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 32,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Guardar Cambios',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: _isLoading ? null : _logout,
+                  child: const Text(
+                    'Cerrar Sesión',
+                    style: TextStyle(color: AppColors.error),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl,
+    IconData icon, {
+    bool enabled = true,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: ctrl,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppColors.primary),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: validator,
+    );
   }
 
   void _showImagePickerOptions() {
@@ -253,74 +436,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Seleccionar foto de perfil',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Seleccionar foto de perfil',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _pickerOption(
+                  Icons.camera_alt,
+                  'Cámara',
+                  () => _pickImage(ImageSource.camera),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildImageOption(
-                    icon: Icons.camera_alt,
-                    label: 'Cámara',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pickImage(ImageSource.camera);
-                    },
-                  ),
-                  _buildImageOption(
-                    icon: Icons.photo_library,
-                    label: 'Galería',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pickImage(ImageSource.gallery);
-                    },
-                  ),
-                  _buildImageOption(
-                    icon: Icons.emoji_emotions,
-                    label: 'Avatar',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showAvatarPicker();
-                    },
-                  ),
-                  if (_profileImage != null || _selectedAvatar != null)
-                    _buildImageOption(
-                      icon: Icons.delete,
-                      label: 'Eliminar',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _clearProfileImage();
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
+                _pickerOption(
+                  Icons.photo_library,
+                  'Galería',
+                  () => _pickImage(ImageSource.gallery),
+                ),
+                _pickerOption(
+                  Icons.emoji_emotions,
+                  'Avatar',
+                  _showAvatarPicker,
+                ),
+                if (_profileImage != null || _selectedAvatar != null)
+                  _pickerOption(Icons.delete, 'Eliminar', _clearProfileImage),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildImageOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _pickerOption(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
       child: Column(
         children: [
           Container(
@@ -345,277 +508,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileAvatar() {
-    if (_selectedAvatar != null) {
-      return CircleAvatar(
-        radius: 60,
-        // ignore: deprecated_member_use
-        backgroundColor: AppColors.primary.withOpacity(0.1),
-        child: Text(_selectedAvatar!, style: const TextStyle(fontSize: 60)),
-      );
-    } else if (_profileImage != null) {
-      return CircleAvatar(
-        radius: 60,
-        // ignore: deprecated_member_use
-        backgroundColor: AppColors.primary.withOpacity(0.1),
-        backgroundImage: FileImage(_profileImage!),
-      );
-    } else {
-      return CircleAvatar(
-        radius: 60,
-        // ignore: deprecated_member_use
-        backgroundColor: AppColors.primary.withOpacity(0.1),
-        child: Icon(Icons.person, size: 60, color: AppColors.primary),
-      );
-    }
-  }
-
-  void _showSuccessSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
-  }
-
-  void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.error),
-    );
-  }
-
-  String? _validateNumber(
-    String? value,
-    String fieldName, {
-    bool isDouble = false,
-  }) {
-    if (value == null || value.isEmpty) return null;
-
-    final number = isDouble ? double.tryParse(value) : int.tryParse(value);
-    if (number == null) return '$fieldName debe ser un número válido';
-    if (number <= 0) return '$fieldName debe ser mayor que cero';
-
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading || _user == null) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('Perfil'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
+  void _showAvatarPicker() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          'Elige tu avatar',
+          style: TextStyle(color: AppColors.primary),
         ),
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Mi Perfil'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Foto de perfil
-                Center(
-                  child: GestureDetector(
-                    onTap: _showImagePickerOptions,
-                    child: Stack(
-                      children: [
-                        _buildProfileAvatar(),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              size: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Formulario
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.shadow,
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _nameCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Nombre completo',
-                          prefixIcon: Icon(
-                            Icons.person_outline,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        validator: (v) => v == null || v.trim().isEmpty
-                            ? 'El nombre es requerido'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(
-                            Icons.email_outlined,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        enabled: false,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _phoneCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Teléfono (opcional)',
-                          prefixIcon: Icon(
-                            Icons.phone_outlined,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _ageCtrl,
-                              decoration: InputDecoration(
-                                labelText: 'Edad (opcional)',
-                                prefixIcon: Icon(
-                                  Icons.cake_outlined,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (v) => _validateNumber(v, 'La edad'),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _heightCtrl,
-                              decoration: InputDecoration(
-                                labelText: 'Altura (cm, opcional)',
-                                prefixIcon: Icon(
-                                  Icons.height,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (v) => _validateNumber(
-                                v,
-                                'La altura',
-                                isDouble: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _weightCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Peso (kg, opcional)',
-                          prefixIcon: Icon(
-                            Icons.monitor_weight_outlined,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (v) =>
-                            _validateNumber(v, 'El peso', isDouble: true),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Botón guardar
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Guardar Cambios',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Botón cerrar sesión
-                TextButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () async {
-                          await UserPrefs.clearUser();
-                          if (!mounted) return;
-                          Navigator.pushReplacementNamed(context, '/login');
-                        },
-                  child: const Text(
-                    'Cerrar Sesión',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 6,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
             ),
+            itemCount: _avatars.length,
+            itemBuilder: (c, i) {
+              final av = _avatars[i];
+              return GestureDetector(
+                onTap: () async {
+                  setState(() => _selectedAvatar = av);
+                  await UserPrefs.saveProfileImage('avatar:$av');
+                  if (mounted) Navigator.pop(context);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _selectedAvatar == av
+                        // ignore: deprecated_member_use
+                        ? AppColors.primary.withOpacity(0.2)
+                        // ignore: deprecated_member_use
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: _selectedAvatar == av
+                        ? Border.all(color: AppColors.primary, width: 2)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(av, style: const TextStyle(fontSize: 24)),
+                  ),
+                ),
+              );
+            },
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
       ),
     );
   }

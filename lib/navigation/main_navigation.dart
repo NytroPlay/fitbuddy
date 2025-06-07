@@ -9,8 +9,7 @@ class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _MainNavigationState createState() => _MainNavigationState();
+  State<MainNavigation> createState() => _MainNavigationState();
 }
 
 class _MainNavigationState extends State<MainNavigation> {
@@ -33,30 +32,26 @@ class _MainNavigationState extends State<MainNavigation> {
             BoxShadow(
               color: AppColors.shadow,
               blurRadius: 10,
-              offset: Offset(0, -5),
+              offset: const Offset(0, -5),
             ),
           ],
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
+          onTap: (index) => setState(() => _currentIndex = index),
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: TextStyle(
+          selectedLabelStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
-          unselectedLabelStyle: TextStyle(
+          unselectedLabelStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
-          items: [
+          items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),

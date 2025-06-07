@@ -1,20 +1,32 @@
 name: fitbudd
-description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+description: A fitness companion app built with Flutter
+publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.8.0
+  sdk: '>=3.8.0 <4.0.0'
+  flutter: '>=3.16.0'
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # UI
   lottie: ^3.3.1
   cupertino_icons: ^1.0.8
-  shared_preferences: ^2.2.2
-  image_picker: ^1.0.4
   fl_chart: ^0.66.2
+  
+  # State & Storage
+  provider: ^6.1.5
+  shared_preferences: ^2.2.2
+  
+  # Media
+  image_picker: ^1.0.7
+  
+  # Utilities
   intl: ^0.20.2
 
 dev_dependencies:
@@ -26,3 +38,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/lottie/
+    # - assets/images/ (añade si tienes imágenes)
+  # fonts: (añade si usas fuentes personalizadas)
+  #   - family: ...

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../navigation/main_navigation.dart';
-import '../utils/app_theme.dart';
-import '../models/user.dart';
-import '../utils/user_prefs.dart';
+import 'package:provider/provider.dart';
+import '../../auth/auth_provider.dart';
+import '../../models/user.dart';
+import '../../utils/app_theme.dart';
+import '../../utils/validators.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,33 +13,29 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _acceptTerms = false;
-  bool _isLoading = false;
+  bool _isSubmitting = false;
 
-  final _formKey = GlobalKey<FormState>();
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
-  Future<void> _register() async {
+  Future<void> _submitForm(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_passwordController.text != _confirmPasswordController.text) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Las contraseñas no coinciden'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
     if (!_acceptTerms) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Debes aceptar los términos y condiciones'),
@@ -48,34 +45,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSubmitting = true);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final newUser = User(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim().toLowerCase(),
+      password: _passwordController.text,
+      phone: null,
+      age: null,
+      height: null,
+      weight: null,
+    );
 
     try {
-      final user = User(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim().toLowerCase(),
-        password: _passwordController.text,
-      );
-
-      await UserPrefs.saveUser(user);
-
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
-      );
+      final success = await authProvider.register(newUser);
+      if (success) {
+        if (!context.mounted) return;
+        Navigator.pushReplacementNamed(context, '/main');
+      } else {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al registrar usuario'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al registrar: ${e.toString()}'),
+          content: Text('Error: ${e.toString()}'),
           backgroundColor: AppColors.error,
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -146,9 +152,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             color: AppColors.primary,
                           ),
                         ),
-                        validator: (v) => v == null || v.trim().isEmpty
-                            ? 'Campo requerido'
-                            : null,
+                        validator: Validators.validateName,
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -161,13 +166,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             color: AppColors.primary,
                           ),
                         ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Campo requerido';
-                          if (!v.contains('@') || !v.contains('.')) {
-                            return 'Email inválido';
-                          }
-                          return null;
-                        },
+                        validator: Validators.validateEmail,
+                        textInputAction: TextInputAction.next,
+                        autocorrect: false,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -186,16 +187,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   : Icons.visibility_off,
                               color: AppColors.textSecondary,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _isPasswordVisible = !_isPasswordVisible;
-                              });
-                            },
+                            onPressed: () => setState(
+                              () => _isPasswordVisible = !_isPasswordVisible,
+                            ),
                           ),
                         ),
-                        validator: (v) => v == null || v.length < 6
-                            ? 'Mínimo 6 caracteres'
-                            : null,
+                        validator: Validators.validatePassword,
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -214,37 +212,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   : Icons.visibility_off,
                               color: AppColors.textSecondary,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _isConfirmPasswordVisible =
-                                    !_isConfirmPasswordVisible;
-                              });
-                            },
+                            onPressed: () => setState(
+                              () => _isConfirmPasswordVisible =
+                                  !_isConfirmPasswordVisible,
+                            ),
                           ),
                         ),
-                        validator: (v) => v == null || v.isEmpty
-                            ? 'Confirma tu contraseña'
-                            : null,
+                        validator: (value) =>
+                            Validators.validateConfirmPassword(
+                              value,
+                              _passwordController.text,
+                            ),
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submitForm(context),
                       ),
                       const SizedBox(height: 20),
                       Row(
                         children: [
                           Checkbox(
                             value: _acceptTerms,
-                            onChanged: (value) {
-                              setState(() {
-                                _acceptTerms = value ?? false;
-                              });
-                            },
+                            onChanged: (v) =>
+                                setState(() => _acceptTerms = v ?? false),
                             activeColor: AppColors.primary,
                           ),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _acceptTerms = !_acceptTerms;
-                                });
-                              },
+                              onTap: () =>
+                                  setState(() => _acceptTerms = !_acceptTerms),
                               child: Text(
                                 'Acepto los términos y condiciones',
                                 style: TextStyle(
@@ -258,17 +252,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
-                        onPressed: _isLoading ? null : _register,
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _submitForm(context),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          backgroundColor: _acceptTerms && !_isLoading
+                          backgroundColor: _acceptTerms && !_isSubmitting
                               ? AppColors.primary
                               : AppColors.textHint,
                         ),
-                        child: _isLoading
+                        child: _isSubmitting
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
                               )
@@ -281,50 +277,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                       ),
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '¿Ya tienes una cuenta? ',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _isSubmitting
+                                ? null
+                                : () => Navigator.pop(context),
+                            child: Text(
+                              'Inicia sesión',
+                              style: TextStyle(
+                                color: _isSubmitting
+                                    ? AppColors.textSecondary
+                                    : AppColors.primary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '¿Ya tienes una cuenta? ',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _isLoading ? null : () => Navigator.pop(context),
-                    child: Text(
-                      'Inicia sesión',
-                      style: TextStyle(
-                        color: _isLoading
-                            ? AppColors.textSecondary
-                            : AppColors.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
   }
 }

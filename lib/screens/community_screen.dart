@@ -1,3 +1,5 @@
+// lib/screens/community_screen.dart
+
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 import '../models/post.dart';
@@ -9,13 +11,12 @@ class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _CommunityScreenState createState() => _CommunityScreenState();
+  State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
 class _CommunityScreenState extends State<CommunityScreen>
     with TickerProviderStateMixin {
-  late TabController _tabController;
+  late final TabController _tabController;
   List<Post> _posts = [];
   List<String> _joinedGroups = [];
   String? _userName;
@@ -26,19 +27,19 @@ class _CommunityScreenState extends State<CommunityScreen>
       userName: 'María González',
       content:
           '¡Acabo de completar mi rutina de cardio! 🔥 30 minutos de HIIT y me siento increíble. ¿Quién más se anima hoy?',
-      date: DateTime.now().subtract(Duration(hours: 2)),
+      date: DateTime.now().subtract(const Duration(hours: 2)),
     ),
     Post(
       userName: 'Carlos Ruiz',
       content:
           'Nuevo récord personal en peso muerto: 120kg! 💪 El trabajo duro siempre da frutos.',
-      date: DateTime.now().subtract(Duration(hours: 4)),
+      date: DateTime.now().subtract(const Duration(hours: 4)),
     ),
     Post(
       userName: 'Ana Martín',
       content:
           'Día de yoga y meditación. A veces el descanso activo es lo que más necesitamos 🧘‍♀️',
-      date: DateTime.now().subtract(Duration(hours: 6)),
+      date: DateTime.now().subtract(const Duration(hours: 6)),
     ),
   ];
 
@@ -87,9 +88,7 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   Future<void> _loadPosts() async {
     final saved = await CommunityPrefs.loadPosts();
-    setState(() {
-      _posts = saved;
-    });
+    setState(() => _posts = saved);
   }
 
   Future<void> _savePosts() async {
@@ -104,9 +103,7 @@ class _CommunityScreenState extends State<CommunityScreen>
       date: DateTime.now(),
       group: group,
     );
-    setState(() {
-      _posts.insert(0, post);
-    });
+    setState(() => _posts.insert(0, post));
     await _savePosts();
   }
 
@@ -123,92 +120,79 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
 
   Future<void> _deletePost(int index) async {
-    setState(() {
-      _posts.removeAt(index);
-    });
+    setState(() => _posts.removeAt(index));
     await _savePosts();
   }
 
   Future<void> _loadGroups() async {
     final joined = await GroupPrefs.loadGroups();
-    setState(() {
-      _joinedGroups = joined;
-    });
+    setState(() => _joinedGroups = joined);
   }
 
   Future<void> _joinGroup(String groupName) async {
     if (!_joinedGroups.contains(groupName)) {
-      setState(() {
-        _joinedGroups.add(groupName);
-      });
+      setState(() => _joinedGroups.add(groupName));
       await GroupPrefs.saveGroups(_joinedGroups);
     }
   }
 
   void _showCreatePostDialog({String? group}) {
     final contentController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.create, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text('Crear Post', style: TextStyle(color: AppColors.primary)),
-            ],
-          ),
-          content: TextField(
-            controller: contentController,
-            maxLines: 4,
-            decoration: InputDecoration(
-              hintText: '¿Qué quieres compartir?',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (contentController.text.isNotEmpty) {
-                  await _addPost(contentController.text, group: group);
-                  // ignore: use_build_context_synchronously
-                  Navigator.of(context).pop();
-                  // ignore: use_build_context_synchronously
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Post publicado exitosamente'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Publicar'),
-            ),
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.create, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text('Crear Post', style: TextStyle(color: AppColors.primary)),
           ],
-        );
-      },
+        ),
+        content: TextField(
+          controller: contentController,
+          maxLines: 4,
+          decoration: InputDecoration(
+            hintText: '¿Qué quieres compartir?',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (contentController.text.isNotEmpty) {
+                await _addPost(contentController.text, group: group);
+                // ignore: use_build_context_synchronously
+                Navigator.of(context).pop();
+                // ignore: use_build_context_synchronously
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Post publicado exitosamente'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Publicar'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -216,43 +200,40 @@ class _CommunityScreenState extends State<CommunityScreen>
     final contentController = TextEditingController(
       text: _posts[index].content,
     );
-
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Editar publicación'),
-          content: TextField(
-            controller: contentController,
-            maxLines: 4,
-            decoration: InputDecoration(border: OutlineInputBorder()),
+      builder: (_) => AlertDialog(
+        title: const Text('Editar publicación'),
+        content: TextField(
+          controller: contentController,
+          maxLines: 4,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (contentController.text.isNotEmpty) {
-                  await _editPost(index, contentController.text);
-                  // ignore: use_build_context_synchronously
-                  Navigator.of(context).pop();
-                }
-              },
-              child: Text('Guardar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                await _deletePost(index);
+          ElevatedButton(
+            onPressed: () async {
+              if (contentController.text.isNotEmpty) {
+                await _editPost(index, contentController.text);
                 // ignore: use_build_context_synchronously
                 Navigator.of(context).pop();
-              },
-              child: Text('Eliminar', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await _deletePost(index);
+              // ignore: use_build_context_synchronously
+              Navigator.of(context).pop();
+            },
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -261,9 +242,8 @@ class _CommunityScreenState extends State<CommunityScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Comunidad'),
+        title: const Text('Comunidad'),
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
@@ -271,7 +251,7 @@ class _CommunityScreenState extends State<CommunityScreen>
           labelColor: Colors.white,
           // ignore: deprecated_member_use
           unselectedLabelColor: Colors.white.withOpacity(0.7),
-          tabs: [
+          tabs: const [
             Tab(text: 'Feed'),
             Tab(text: 'Ranking'),
             Tab(text: 'Grupos'),
@@ -284,40 +264,39 @@ class _CommunityScreenState extends State<CommunityScreen>
       ),
       floatingActionButton: _tabController.index == 0
           ? FloatingActionButton(
-              onPressed: () => _showCreatePostDialog(),
+              onPressed: _showCreatePostDialog,
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              child: Icon(Icons.add),
+              child: const Icon(Icons.add),
             )
           : null,
     );
   }
 
   Widget _buildFeedTab() {
-    // Feed: posts predeterminados + posts del usuario (sin grupo)
     final feedPosts = [
       ..._defaultPosts,
       ..._posts.where((p) => p.group == null),
     ];
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () async => await _loadPosts(),
+      onRefresh: _loadPosts,
       child: feedPosts.isEmpty
-          ? Center(child: Text('No hay publicaciones aún.'))
+          ? const Center(child: Text('No hay publicaciones aún.'))
           : ListView.builder(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               itemCount: feedPosts.length,
-              itemBuilder: (context, index) {
-                final post = feedPosts[index];
+              itemBuilder: (_, i) {
+                final post = feedPosts[i];
                 final isMine = post.userName == _userName;
                 return Card(
-                  margin: EdgeInsets.only(bottom: 16),
+                  margin: const EdgeInsets.only(bottom: 16),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primary,
                       child: Text(
                         post.userName.isNotEmpty ? post.userName[0] : '?',
-                        style: TextStyle(color: Colors.white),
+                        style: const TextStyle(color: Colors.white),
                       ),
                     ),
                     title: Text(post.userName),
@@ -325,9 +304,10 @@ class _CommunityScreenState extends State<CommunityScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(post.content),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          '${post.date.day}/${post.date.month}/${post.date.year} ${post.date.hour}:${post.date.minute.toString().padLeft(2, '0')}',
+                          '${post.date.day}/${post.date.month}/${post.date.year} '
+                          '${post.date.hour}:${post.date.minute.toString().padLeft(2, '0')}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -337,17 +317,13 @@ class _CommunityScreenState extends State<CommunityScreen>
                     ),
                     trailing: isMine
                         ? PopupMenuButton<String>(
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                final realIndex = _posts.indexWhere(
-                                  (p) => p == post,
-                                );
-                                if (realIndex != -1) {
-                                  _showEditPostDialog(realIndex);
-                                }
+                            onSelected: (v) {
+                              if (v == 'edit') {
+                                final idx = _posts.indexWhere((p) => p == post);
+                                if (idx != -1) _showEditPostDialog(idx);
                               }
                             },
-                            itemBuilder: (context) => [
+                            itemBuilder: (_) => const [
                               PopupMenuItem(
                                 value: 'edit',
                                 child: Text('Editar / Eliminar'),
@@ -371,19 +347,19 @@ class _CommunityScreenState extends State<CommunityScreen>
       {'name': 'Sofia López', 'points': 920},
     ];
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: leaderboard.length,
-      itemBuilder: (context, index) {
-        final user = leaderboard[index] as Map<String, dynamic>;
+      itemBuilder: (_, i) {
+        final user = leaderboard[i];
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: AppColors.primary,
-            child: Text(user['name'][0]),
+            child: Text(user['name']![0]),
           ),
           title: Text(user['name'] as String),
           trailing: Text(
             '${user['points']} pts',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         );
       },
@@ -392,13 +368,13 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   Widget _buildGroupsTab() {
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: _groups.length,
-      itemBuilder: (context, index) {
-        final group = _groups[index];
+      itemBuilder: (_, i) {
+        final group = _groups[i];
         final joined = _joinedGroups.contains(group['name']);
         return Card(
-          margin: EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: group['color'],
@@ -423,7 +399,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                         ),
                       );
                     },
-                    child: Text('Entrar'),
+                    child: const Text('Entrar'),
                   )
                 : ElevatedButton(
                     onPressed: () async {
@@ -437,7 +413,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                         ),
                       );
                     },
-                    child: Text('Unirse'),
+                    child: const Text('Unirse'),
                   ),
           ),
         );
@@ -446,7 +422,15 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
 }
 
-// Pantalla para ver y publicar en un grupo
+extension on Object? {
+  String operator [](int other) {
+    throw UnimplementedError('This operator is not implemented.');
+  }
+}
+
+// ------------------------------
+// Pantalla de posts por grupo
+// ------------------------------
 class GroupPostsScreen extends StatefulWidget {
   final String groupName;
   final String userName;
@@ -477,14 +461,14 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
         backgroundColor: AppColors.primary,
       ),
       body: groupPosts.isEmpty
-          ? Center(child: Text('No hay publicaciones en este grupo.'))
+          ? const Center(child: Text('No hay publicaciones en este grupo.'))
           : ListView.builder(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               itemCount: groupPosts.length,
-              itemBuilder: (context, index) {
-                final post = groupPosts[index];
+              itemBuilder: (_, i) {
+                final post = groupPosts[i];
                 return Card(
-                  margin: EdgeInsets.only(bottom: 16),
+                  margin: const EdgeInsets.only(bottom: 16),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primary,
@@ -497,9 +481,10 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(post.content),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          '${post.date.day}/${post.date.month}/${post.date.year} ${post.date.hour}:${post.date.minute.toString().padLeft(2, '0')}',
+                          '${post.date.day}/${post.date.month}/${post.date.year} '
+                          '${post.date.hour}:${post.date.minute.toString().padLeft(2, '0')}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -513,15 +498,15 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final contentController = TextEditingController();
+          final controller = TextEditingController();
           await showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: Text('Nueva publicación'),
+            builder: (_) => AlertDialog(
+              title: const Text('Nueva publicación'),
               content: TextField(
-                controller: contentController,
+                controller: controller,
                 maxLines: 4,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: '¿Qué quieres compartir en el grupo?',
                 ),
@@ -529,18 +514,18 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancelar'),
+                  child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    if (contentController.text.isNotEmpty) {
-                      await widget.onAddPost(contentController.text);
+                    if (controller.text.isNotEmpty) {
+                      await widget.onAddPost(controller.text);
                       // ignore: use_build_context_synchronously
                       Navigator.pop(context);
                       setState(() {});
                     }
                   },
-                  child: Text('Publicar'),
+                  child: const Text('Publicar'),
                 ),
               ],
             ),
@@ -548,7 +533,7 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
           setState(() {});
         },
         backgroundColor: AppColors.primary,
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
       ),
     );
   }

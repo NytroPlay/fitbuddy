@@ -1,43 +1,77 @@
-import 'package:fitbudd/navigation/main_navigation.dart';
-import 'package:fitbudd/screens/login_screen.dart';
-import 'package:fitbudd/screens/profile_screen.dart';
-import 'package:fitbudd/screens/register_screen.dart';
-import 'package:fitbudd/utils/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-void main() async {
+import 'auth/auth_provider.dart';
+import 'auth/auth_service.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart'; // <-- ¡IMPORTANTE!
+import 'navigation/main_navigation.dart';
+import 'utils/app_theme.dart';
+import 'utils/user_prefs.dart';
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: const FitBuddyApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class FitBuddyApp extends StatelessWidget {
+  const FitBuddyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'FitBuddy',
-      theme: AppTheme.lightTheme, // Usa tu tema personalizado
-      darkTheme: AppTheme.darkTheme, // Opcional: tema oscuro
-      themeMode: ThemeMode.light, // Puedes cambiarlo según preferencias
-      initialRoute: '/login',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const AuthWrapper(),
       routes: {
         '/login': (_) => const LoginScreen(),
-        '/register': (_) => const RegisterScreen(),
-        '/profile': (_) => const ProfileScreen(),
-        '/main': (_) =>
-            const MainNavigation(), // Ruta principal después de login
-      },
-      onGenerateRoute: (settings) {
-        // Manejo de rutas no definidas
-        return MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(title: const Text('Error')),
-            body: Center(child: Text('Ruta no encontrada: ${settings.name}')),
-          ),
-        );
+        '/register': (_) => const RegisterScreen(), // <-- AGREGA ESTA LÍNEA
+        '/main': (_) => const MainNavigation(),
       },
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _loading = true;
+  bool _authed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isAuth = await UserPrefs.isAuthenticated();
+    if (isAuth) {
+      final user = await AuthService().getCurrentUser();
+      if (user != null) {
+        authProvider.setUser(user);
+        _authed = true;
+      }
+    }
+    setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return _authed ? const MainNavigation() : const LoginScreen();
   }
 }
