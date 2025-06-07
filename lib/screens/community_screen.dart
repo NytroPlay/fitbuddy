@@ -535,6 +535,7 @@ class _GroupPostsScreenState extends State<GroupPostsScreen> {
                   onPressed: () async {
                     if (contentController.text.isNotEmpty) {
                       await widget.onAddPost(contentController.text);
+                      // ignore: use_build_context_synchronously
                       Navigator.pop(context);
                       setState(() {});
                     }

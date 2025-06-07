@@ -5,11 +5,10 @@ import '../models/user.dart';
 import '../utils/user_prefs.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key, required Null Function() onRegistered});
+  const RegisterScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _RegisterScreenState createState() => _RegisterScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
@@ -20,15 +19,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _acceptTerms = false;
+  bool _isLoading = false;
 
   final _formKey = GlobalKey<FormState>();
 
-  void _register() async {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_passwordController.text != _confirmPasswordController.text) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Las contraseñas no coinciden'),
           backgroundColor: AppColors.error,
         ),
@@ -36,19 +37,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    final user = User(
-      name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
-    await UserPrefs.saveUser(user);
+    if (!_acceptTerms) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes aceptar los términos y condiciones'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
-    // Navega a la pantalla principal
-    Navigator.pushReplacement(
-      // ignore: use_build_context_synchronously
-      context,
-      MaterialPageRoute(builder: (context) => MainNavigation()),
-    );
+    setState(() => _isLoading = true);
+
+    try {
+      final user = User(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim().toLowerCase(),
+        password: _passwordController.text,
+      );
+
+      await UserPrefs.saveUser(user);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al registrar: ${e.toString()}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -56,18 +84,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Crear Cuenta'),
+        title: const Text('Crear Cuenta'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               Center(
                 child: Column(
                   children: [
@@ -79,7 +107,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Crea tu cuenta y comienza tu viaje fitness',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -90,9 +118,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
               Container(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -100,7 +128,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     BoxShadow(
                       color: AppColors.shadow,
                       blurRadius: 10,
-                      offset: Offset(0, 5),
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -109,7 +137,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Campo de nombre
                       TextFormField(
                         controller: _nameController,
                         decoration: InputDecoration(
@@ -123,8 +150,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ? 'Campo requerido'
                             : null,
                       ),
-                      SizedBox(height: 16),
-                      // Campo de email
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
@@ -135,12 +161,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             color: AppColors.primary,
                           ),
                         ),
-                        validator: (v) => v == null || !v.contains('@')
-                            ? 'Email inválido'
-                            : null,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Campo requerido';
+                          if (!v.contains('@') || !v.contains('.')) {
+                            return 'Email inválido';
+                          }
+                          return null;
+                        },
                       ),
-                      SizedBox(height: 16),
-                      // Campo de contraseña
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: !_isPasswordVisible,
@@ -168,8 +197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ? 'Mínimo 6 caracteres'
                             : null,
                       ),
-                      SizedBox(height: 16),
-                      // Campo de confirmar contraseña
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: !_isConfirmPasswordVisible,
@@ -198,8 +226,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ? 'Confirma tu contraseña'
                             : null,
                       ),
-                      SizedBox(height: 20),
-                      // Checkbox de términos
+                      const SizedBox(height: 20),
                       Row(
                         children: [
                           Checkbox(
@@ -229,34 +256,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 24),
-                      // Botón de registro
+                      const SizedBox(height: 24),
                       ElevatedButton(
-                        onPressed: _acceptTerms ? _register : null,
+                        onPressed: _isLoading ? null : _register,
                         style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          backgroundColor: _acceptTerms
+                          backgroundColor: _acceptTerms && !_isLoading
                               ? AppColors.primary
                               : AppColors.textHint,
                         ),
-                        child: Text(
-                          'Crear Cuenta',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'Crear Cuenta',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ],
                   ),
                 ),
               ),
-              SizedBox(height: 32),
-              // Enlace a login
+              const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -268,13 +297,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                    },
+                    onTap: _isLoading ? null : () => Navigator.pop(context),
                     child: Text(
                       'Inicia sesión',
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: _isLoading
+                            ? AppColors.textSecondary
+                            : AppColors.primary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -282,11 +311,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 }

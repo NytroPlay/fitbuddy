@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Importa shared_preferences
 import '../models/user.dart';
 import '../utils/user_prefs.dart';
 import '../utils/app_theme.dart';
@@ -14,24 +13,22 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  User? user;
+  User? _user;
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController nameCtrl,
-      emailCtrl,
-      phoneCtrl,
-      ageCtrl,
-      heightCtrl,
-      weightCtrl;
+  late TextEditingController _nameCtrl;
+  late TextEditingController _emailCtrl;
+  late TextEditingController _phoneCtrl;
+  late TextEditingController _ageCtrl;
+  late TextEditingController _heightCtrl;
+  late TextEditingController _weightCtrl;
+
   File? _profileImage;
   String? _selectedAvatar;
+  bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
 
-  // Claves para guardar en shared_preferences
-  static const String _prefKeyImage = 'profile_image';
-  static const String _prefKeyAvatar = 'selected_avatar';
-
   // Lista de avatares/emojis disponibles
-  final List<String> _avatars = [
+  static const List<String> _avatars = [
     '😊',
     '😎',
     '🤗',
@@ -69,49 +66,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeControllers();
     _loadProfileData();
   }
 
+  void _initializeControllers() {
+    _nameCtrl = TextEditingController();
+    _emailCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
+    _ageCtrl = TextEditingController();
+    _heightCtrl = TextEditingController();
+    _weightCtrl = TextEditingController();
+  }
+
   Future<void> _loadProfileData() async {
-    await _loadUserData();
-    await _loadImageFromPrefs(); // Cargar imagen/avatar de shared_preferences
-  }
+    setState(() => _isLoading = true);
+    try {
+      _user = await UserPrefs.loadUser();
+      if (_user != null) {
+        _nameCtrl.text = _user!.name;
+        _emailCtrl.text = _user!.email;
+        _phoneCtrl.text = _user!.phone ?? '';
+        _ageCtrl.text = _user!.age?.toString() ?? '';
+        _heightCtrl.text = _user!.height?.toString() ?? '';
+        _weightCtrl.text = _user!.weight?.toString() ?? '';
 
-  Future<void> _loadUserData() async {
-    user = await UserPrefs.loadUser();
-    nameCtrl = TextEditingController(text: user?.name ?? '');
-    emailCtrl = TextEditingController(text: user?.email ?? '');
-    phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    ageCtrl = TextEditingController(text: user?.age?.toString() ?? '');
-    heightCtrl = TextEditingController(text: user?.height?.toString() ?? '');
-    weightCtrl = TextEditingController(text: user?.weight?.toString() ?? '');
-    setState(() {});
-  }
-
-  Future<void> _loadImageFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final imagePath = prefs.getString(_prefKeyImage);
-    final avatar = prefs.getString(_prefKeyAvatar);
-
-    setState(() {
-      if (imagePath != null) {
-        _profileImage = File(imagePath);
-        _selectedAvatar = null;
-      } else if (avatar != null) {
-        _selectedAvatar = avatar;
-        _profileImage = null;
+        // Cargar imagen/avatar
+        final prefsData = await UserPrefs.getProfileImage();
+        if (prefsData != null) {
+          if (prefsData.startsWith('avatar:')) {
+            _selectedAvatar = prefsData.replaceFirst('avatar:', '');
+          } else {
+            _profileImage = File(prefsData);
+          }
+        }
       }
-    });
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   void dispose() {
-    nameCtrl.dispose();
-    emailCtrl.dispose();
-    phoneCtrl.dispose();
-    ageCtrl.dispose();
-    heightCtrl.dispose();
-    weightCtrl.dispose();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _ageCtrl.dispose();
+    _heightCtrl.dispose();
+    _weightCtrl.dispose();
     super.dispose();
   }
 
@@ -127,92 +133,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (pickedFile != null) {
         setState(() {
           _profileImage = File(pickedFile.path);
-          _selectedAvatar = null; // Limpiar avatar si se selecciona imagen
+          _selectedAvatar = null;
         });
-        await _saveImageToPrefs(
-          pickedFile.path,
-        ); // Guardar ruta en shared_preferences
+        await UserPrefs.saveProfileImage(pickedFile.path);
       }
     } catch (e) {
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al seleccionar imagen: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _showErrorSnackbar('Error al seleccionar imagen: $e');
     }
-  }
-
-  Future<void> _saveImageToPrefs(String imagePath) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKeyImage, imagePath);
-    await prefs.remove(_prefKeyAvatar); // Limpiar avatar si se guarda imagen
-  }
-
-  void _showImagePickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Seleccionar foto de perfil',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-            SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildImageOption(
-                  icon: Icons.camera_alt,
-                  label: 'Cámara',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                _buildImageOption(
-                  icon: Icons.photo_library,
-                  label: 'Galería',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                _buildImageOption(
-                  icon: Icons.emoji_emotions,
-                  label: 'Avatar',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showAvatarPicker();
-                  },
-                ),
-                if (_profileImage != null || _selectedAvatar != null)
-                  _buildImageOption(
-                    icon: Icons.delete,
-                    label: 'Eliminar',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _clearProfileImage();
-                    },
-                  ),
-              ],
-            ),
-            SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
   }
 
   void _showAvatarPicker() {
@@ -225,9 +152,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         content: SizedBox(
           width: double.maxFinite,
-          height: 300,
           child: GridView.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 6,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
@@ -236,16 +163,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             itemBuilder: (context, index) {
               final avatar = _avatars[index];
               return GestureDetector(
-                onTap: () {
+                onTap: () async {
                   setState(() {
                     _selectedAvatar = avatar;
-                    _profileImage =
-                        null; // Limpiar imagen si se selecciona avatar
+                    _profileImage = null;
                   });
-                  _saveAvatarToPrefs(
-                    avatar,
-                  ); // Guardar avatar en shared_preferences
-                  Navigator.pop(context);
+                  await UserPrefs.saveProfileImage('avatar:$avatar');
+                  // ignore: use_build_context_synchronously
+                  if (mounted) Navigator.pop(context);
                 },
                 child: Container(
                   decoration: BoxDecoration(
@@ -260,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         : null,
                   ),
                   child: Center(
-                    child: Text(avatar, style: TextStyle(fontSize: 24)),
+                    child: Text(avatar, style: const TextStyle(fontSize: 24)),
                   ),
                 ),
               );
@@ -270,27 +195,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
+            child: const Text('Cancelar'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _saveAvatarToPrefs(String avatar) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKeyAvatar, avatar);
-    await prefs.remove(_prefKeyImage); // Limpiar imagen si se guarda avatar
-  }
-
   Future<void> _clearProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_prefKeyImage);
-    await prefs.remove(_prefKeyAvatar);
+    await UserPrefs.clearProfileImage();
     setState(() {
       _profileImage = null;
       _selectedAvatar = null;
     });
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final updatedUser = User(
+        name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        password: _user!.password, // Mantener la contraseña existente
+        phone: _phoneCtrl.text.trim().isNotEmpty
+            ? _phoneCtrl.text.trim()
+            : null,
+        age: _ageCtrl.text.trim().isNotEmpty
+            ? int.parse(_ageCtrl.text.trim())
+            : null,
+        height: _heightCtrl.text.trim().isNotEmpty
+            ? double.parse(_heightCtrl.text.trim())
+            : null,
+        weight: _weightCtrl.text.trim().isNotEmpty
+            ? double.parse(_weightCtrl.text.trim())
+            : null,
+      );
+
+      await UserPrefs.saveUser(updatedUser);
+      setState(() => _user = updatedUser);
+
+      _showSuccessSnackbar('Perfil actualizado correctamente');
+    } catch (e) {
+      _showErrorSnackbar('Error al guardar: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Seleccionar foto de perfil',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildImageOption(
+                    icon: Icons.camera_alt,
+                    label: 'Cámara',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickImage(ImageSource.camera);
+                    },
+                  ),
+                  _buildImageOption(
+                    icon: Icons.photo_library,
+                    label: 'Galería',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickImage(ImageSource.gallery);
+                    },
+                  ),
+                  _buildImageOption(
+                    icon: Icons.emoji_emotions,
+                    label: 'Avatar',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showAvatarPicker();
+                    },
+                  ),
+                  if (_profileImage != null || _selectedAvatar != null)
+                    _buildImageOption(
+                      icon: Icons.delete,
+                      label: 'Eliminar',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _clearProfileImage();
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildImageOption({
@@ -303,7 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               // ignore: deprecated_member_use
               color: AppColors.primary.withOpacity(0.1),
@@ -311,65 +332,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Icon(icon, size: 32, color: AppColors.primary),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    try {
-      final updatedUser = User(
-        name: nameCtrl.text.trim(),
-        email: emailCtrl.text.trim(),
-        password: user!.password,
-        phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-        age: int.tryParse(ageCtrl.text),
-        height: double.tryParse(heightCtrl.text),
-        weight: double.tryParse(weightCtrl.text),
-      );
-
-      await UserPrefs.saveUser(updatedUser);
-
-      setState(() {
-        user = updatedUser;
-      });
-
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Perfil actualizado correctamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al guardar: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
-  }
-
   Widget _buildProfileAvatar() {
     if (_selectedAvatar != null) {
-      // Mostrar emoji/avatar
       return CircleAvatar(
         radius: 60,
         // ignore: deprecated_member_use
         backgroundColor: AppColors.primary.withOpacity(0.1),
-        child: Text(_selectedAvatar!, style: TextStyle(fontSize: 60)),
+        child: Text(_selectedAvatar!, style: const TextStyle(fontSize: 60)),
       );
     } else if (_profileImage != null) {
-      // Mostrar imagen seleccionada
       return CircleAvatar(
         radius: 60,
         // ignore: deprecated_member_use
@@ -377,7 +361,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundImage: FileImage(_profileImage!),
       );
     } else {
-      // Mostrar icono por defecto
       return CircleAvatar(
         radius: 60,
         // ignore: deprecated_member_use
@@ -387,17 +370,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
+  }
+
+  String? _validateNumber(
+    String? value,
+    String fieldName, {
+    bool isDouble = false,
+  }) {
+    if (value == null || value.isEmpty) return null;
+
+    final number = isDouble ? double.tryParse(value) : int.tryParse(value);
+    if (number == null) return '$fieldName debe ser un número válido';
+    if (number <= 0) return '$fieldName debe ser mayor que cero';
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (user == null) {
+    if (_isLoading || _user == null) {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: Text('Perfil'),
+          title: const Text('Perfil'),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
-        body: Center(
+        body: const Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
@@ -406,14 +415,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Mi Perfil'),
+        title: const Text('Mi Perfil'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
@@ -430,13 +439,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           bottom: 0,
                           right: 0,
                           child: Container(
-                            padding: EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.edit,
                               size: 20,
                               color: Colors.white,
@@ -448,11 +457,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                SizedBox(height: 32),
+                const SizedBox(height: 32),
 
                 // Formulario
                 Container(
-                  padding: EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -460,14 +469,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       BoxShadow(
                         color: AppColors.shadow,
                         blurRadius: 10,
-                        offset: Offset(0, 5),
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
                   child: Column(
                     children: [
                       TextFormField(
-                        controller: nameCtrl,
+                        controller: _nameCtrl,
                         decoration: InputDecoration(
                           labelText: 'Nombre completo',
                           prefixIcon: Icon(
@@ -479,9 +488,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? 'El nombre es requerido'
                             : null,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       TextFormField(
-                        controller: emailCtrl,
+                        controller: _emailCtrl,
                         decoration: InputDecoration(
                           labelText: 'Email',
                           prefixIcon: Icon(
@@ -491,9 +500,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         enabled: false,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       TextFormField(
-                        controller: phoneCtrl,
+                        controller: _phoneCtrl,
                         decoration: InputDecoration(
                           labelText: 'Teléfono (opcional)',
                           prefixIcon: Icon(
@@ -503,86 +512,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         keyboardType: TextInputType.phone,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
                             child: TextFormField(
-                              controller: ageCtrl,
+                              controller: _ageCtrl,
                               decoration: InputDecoration(
-                                labelText: 'Edad',
+                                labelText: 'Edad (opcional)',
                                 prefixIcon: Icon(
                                   Icons.cake_outlined,
                                   color: AppColors.primary,
                                 ),
                               ),
                               keyboardType: TextInputType.number,
+                              validator: (v) => _validateNumber(v, 'La edad'),
                             ),
                           ),
-                          SizedBox(width: 16),
+                          const SizedBox(width: 16),
                           Expanded(
                             child: TextFormField(
-                              controller: heightCtrl,
+                              controller: _heightCtrl,
                               decoration: InputDecoration(
-                                labelText: 'Altura (cm)',
+                                labelText: 'Altura (cm, opcional)',
                                 prefixIcon: Icon(
                                   Icons.height,
                                   color: AppColors.primary,
                                 ),
                               ),
                               keyboardType: TextInputType.number,
+                              validator: (v) => _validateNumber(
+                                v,
+                                'La altura',
+                                isDouble: true,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       TextFormField(
-                        controller: weightCtrl,
+                        controller: _weightCtrl,
                         decoration: InputDecoration(
-                          labelText: 'Peso (kg)',
+                          labelText: 'Peso (kg, opcional)',
                           prefixIcon: Icon(
                             Icons.monitor_weight_outlined,
                             color: AppColors.primary,
                           ),
                         ),
                         keyboardType: TextInputType.number,
+                        validator: (v) =>
+                            _validateNumber(v, 'El peso', isDouble: true),
                       ),
                     ],
                   ),
                 ),
 
-                SizedBox(height: 32),
+                const SizedBox(height: 32),
 
                 // Botón guardar
                 ElevatedButton(
-                  onPressed: _saveProfile,
+                  onPressed: _isLoading ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
-                    'Guardar Cambios',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Guardar Cambios',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
 
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 // Botón cerrar sesión
                 TextButton(
-                  onPressed: () async {
-                    await UserPrefs.clearUser();
-                    // ignore: use_build_context_synchronously
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
-                  child: Text(
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          await UserPrefs.clearUser();
+                          if (!mounted) return;
+                          Navigator.pushReplacementNamed(context, '/login');
+                        },
+                  child: const Text(
                     'Cerrar Sesión',
                     style: TextStyle(
                       color: AppColors.error,
