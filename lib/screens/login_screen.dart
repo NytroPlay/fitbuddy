@@ -1,3 +1,5 @@
+// lib/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../auth/auth_provider.dart';
@@ -35,10 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
-
-      if (success) {
-        if (!context.mounted) return;
-        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      if (success && context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/main', (r) => false);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -58,156 +58,189 @@ class _LoginScreenState extends State<LoginScreen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      '¡Bienvenido de nuevo!',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Inicia sesión para continuar',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Form(
-                  key: _formKey,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Máximo ancho de la tarjeta en pantallas muy grandes
+            final maxWidth = constraints.maxWidth > 600
+                ? 600.0
+                : constraints.maxWidth * 0.9;
+
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (authProvider.error != null) ...[
-                        Text(
-                          authProvider.error!,
-                          style: const TextStyle(color: AppColors.error),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: 'Correo electrónico',
-                          prefixIcon: Icon(
-                            Icons.email_outlined,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        validator: Validators.validateEmail,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: !_isPasswordVisible,
-                        decoration: InputDecoration(
-                          labelText: 'Contraseña',
-                          prefixIcon: Icon(
-                            Icons.lock_outlined,
-                            color: AppColors.primary,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _isPasswordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: AppColors.textSecondary,
+                      // Cabecera junto al AppBar
+                      Text(
+                        '¡Bienvenido de nuevo!',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
                             ),
-                            onPressed: () => setState(
-                              () => _isPasswordVisible = !_isPasswordVisible,
-                            ),
-                          ),
-                        ),
-                        validator: Validators.validatePassword,
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Inicia sesión para continuar',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+
                       const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => _handleLogin(context),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          backgroundColor: AppColors.primary,
+
+                      // Caja blanca con el formulario
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.shadow,
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
                         ),
-                        child: _isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                'Iniciar Sesión',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (authProvider.error != null) ...[
+                                Text(
+                                  authProvider.error!,
+                                  style: const TextStyle(
+                                    color: AppColors.error,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
+                                const SizedBox(height: 12),
+                              ],
+
+                              // Email
+                              TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  labelText: 'Correo electrónico',
+                                  prefixIcon: Icon(
+                                    Icons.email_outlined,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                validator: Validators.validateEmail,
                               ),
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '¿No tienes cuenta? ',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: _isLoading
-                                ? null
-                                : () =>
-                                      Navigator.pushNamed(context, '/register'),
-                            child: Text(
-                              'Regístrate',
-                              style: TextStyle(
-                                color: _isLoading
-                                    ? AppColors.textSecondary
-                                    : AppColors.primary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                              const SizedBox(height: 16),
+
+                              // Contraseña
+                              TextFormField(
+                                controller: _passwordController,
+                                obscureText: !_isPasswordVisible,
+                                decoration: InputDecoration(
+                                  labelText: 'Contraseña',
+                                  prefixIcon: Icon(
+                                    Icons.lock_outlined,
+                                    color: AppColors.primary,
+                                  ),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _isPasswordVisible
+                                          ? Icons.visibility
+                                          : Icons.visibility_off,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    onPressed: () => setState(
+                                      () => _isPasswordVisible =
+                                          !_isPasswordVisible,
+                                    ),
+                                  ),
+                                ),
+                                validator: Validators.validatePassword,
                               ),
-                            ),
+                              const SizedBox(height: 24),
+
+                              // Botón Iniciar sesión
+                              ElevatedButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () => _handleLogin(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Iniciar Sesión',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
+
+                              const SizedBox(height: 32),
+
+                              // Link a registro
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '¿No tienes cuenta? ',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: _isLoading
+                                        ? null
+                                        : () => Navigator.pushNamed(
+                                            context,
+                                            '/register',
+                                          ),
+                                    child: Text(
+                                      'Regístrate',
+                                      style: TextStyle(
+                                        color: _isLoading
+                                            ? AppColors.textSecondary
+                                            : AppColors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

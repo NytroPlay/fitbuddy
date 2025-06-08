@@ -1,17 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.example.fitbudd">
 
     <!-- Permisos básicos -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     
-    <!-- Permisos para cámara y almacenamiento (si usas imágenes) -->
+    <!-- Permisos para cámara y almacenamiento -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28"/> <!-- Para Android 10+ -->
-
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
+    
     <application
+        tools:replace="android:label,android:name"
         android:name="io.flutter.app.FlutterApplication"
         android:label="FitBuddy"
         android:icon="@mipmap/ic_launcher"
@@ -37,11 +40,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Para deep linking (opcional) -->
+        <!-- Deep linking (opcional) -->
         <meta-data
             android:name="flutter_deeplinking_enabled"
             android:value="true"/>
             
+        <!-- UCrop para recorte de imágenes -->
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
