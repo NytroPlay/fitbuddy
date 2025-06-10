@@ -139,6 +139,32 @@ class UserPrefs {
     }
   }
 
+  // === LOGROS / ACHIEVEMENTS ===
+  static const _keyAchievements = 'achievements';
+
+  static Future<void> saveAchievements(Map<String, bool> achievements) async {
+    final prefs = await _instance;
+    await prefs.setString(_keyAchievements, jsonEncode(achievements));
+  }
+
+  static Future<Map<String, bool>> loadAchievements() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_keyAchievements);
+    if (raw == null) {
+      return {};
+    }
+    final decoded = Map<String, dynamic>.from(jsonDecode(raw));
+    return decoded.map((k, v) => MapEntry(k, v as bool));
+  }
+
+  static Future<void> unlockAchievement(String key) async {
+    final achievements = await loadAchievements();
+    if (!(achievements[key] ?? false)) {
+      achievements[key] = true;
+      await saveAchievements(achievements);
+    }
+  }
+
   static Future getProfileImage() async {}
 
   static Future<void> saveProfileImage(String newAvatarUrl) async {}

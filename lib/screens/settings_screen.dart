@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../screens/achievements_screen.dart';
+import '../screens/feedback_screen.dart';
 import '../utils/user_prefs.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -80,6 +82,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const Divider(height: 32),
+          ListTile(
+            leading: Icon(Icons.feedback_outlined),
+            title: Text('Enviar Feedback'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FeedbackScreen()));
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.emoji_events_outlined),
+            title: Text('Logros'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AchievementsScreen()),
+              );
+            },
+          ),
           ListTile(
             title: const Text('Cerrar sesión'),
             trailing: const Icon(Icons.logout),
