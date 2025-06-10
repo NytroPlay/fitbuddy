@@ -1,14 +1,33 @@
 // lib/utils/user_prefs.dart
 
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/user.dart';
 
 class UserPrefs {
   static const _keyUsersList = 'users_list';
   static const _keyCurrentUserId = 'current_user_id';
   static const _keyAuthToken = 'auth_token';
+
+  static const _keySettings = 'settings';
+  // ==== SETTINGS / CONFIGURACIÓN ====
+  static Future<void> saveSettings(Map<String, dynamic> settings) async {
+    final prefs = await _instance;
+    await prefs.setString(_keySettings, jsonEncode(settings));
+  }
+
+  static Future<Map<String, dynamic>> loadSettings() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_keySettings);
+    if (raw == null) {
+      // Defaults si nunca se guardó
+      return {'notifications': true, 'private': false, 'language': 'es'};
+    }
+    return Map<String, dynamic>.from(jsonDecode(raw));
+  }
 
   static Future<SharedPreferences> get _instance async =>
       await SharedPreferences.getInstance();
