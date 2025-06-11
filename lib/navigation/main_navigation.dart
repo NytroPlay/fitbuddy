@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import '../screens/profile_screen.dart';
-import '../screens/routines_screen.dart';
-import '../screens/progress_screen.dart';
+
 import '../screens/community_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/progress_screen.dart';
+import '../screens/routines_screen.dart';
+import '../screens/settings_screen.dart';
 import '../utils/app_theme.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -20,6 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
     RoutinesScreen(),
     ProgressScreen(),
     CommunityScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -71,6 +74,10 @@ class _MainNavigationState extends State<MainNavigation> {
               icon: Icon(Icons.people_outline),
               activeIcon: Icon(Icons.people),
               label: 'Comunidad',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: 'Configuración',
             ),
           ],
         ),
