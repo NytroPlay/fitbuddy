@@ -48,8 +48,6 @@ class User {
     );
   }
 
-  get avatarUrl => null;
-
   Map<String, dynamic> toJson() {
     final m = <String, dynamic>{
       'id': id,
@@ -80,7 +78,6 @@ class User {
     double? weight,
     DateTime? createdAt,
     String? avatar,
-    required String avatarUrl,
   }) {
     return User(
       id: id ?? this.id,
