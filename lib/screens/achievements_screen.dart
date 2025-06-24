@@ -15,6 +15,11 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     '7_dias_mes': false,
     'primer_comunidad': false,
     'primer_feedback': false,
+    'weekly_challenge_workout_frequency': false,
+    'weekly_challenge_routine_completion': false,
+    'weekly_challenge_consistency': false,
+    'weekly_challenge_community_engagement': false,
+    'weekly_challenge_weekly_minutes': false,
   };
 
   @override
@@ -84,6 +89,41 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             title: 'Primer feedback enviado',
             unlocked: _logros['primer_feedback'] ?? false,
             icon: Icons.feedback,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Desafíos Semanales',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildBadge(
+            title: 'Maestro de la Frecuencia 💪',
+            unlocked: _logros['weekly_challenge_workout_frequency'] ?? false,
+            icon: Icons.fitness_center,
+          ),
+          _buildBadge(
+            title: 'Completador de Rutinas 🎯',
+            unlocked: _logros['weekly_challenge_routine_completion'] ?? false,
+            icon: Icons.task_alt,
+          ),
+          _buildBadge(
+            title: 'Racha de Fuego 🔥',
+            unlocked: _logros['weekly_challenge_consistency'] ?? false,
+            icon: Icons.local_fire_department,
+          ),
+          _buildBadge(
+            title: 'Estrella de la Comunidad 🤝',
+            unlocked: _logros['weekly_challenge_community_engagement'] ?? false,
+            icon: Icons.people,
+          ),
+          _buildBadge(
+            title: 'Cronómetro de Oro ⏱️',
+            unlocked: _logros['weekly_challenge_weekly_minutes'] ?? false,
+            icon: Icons.timer,
           ),
         ],
       ),

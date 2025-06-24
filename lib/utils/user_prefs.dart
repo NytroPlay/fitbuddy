@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user.dart';
+import '../models/weekly_challenge.dart';
 
 class UserPrefs {
   static const _keyUsersList = 'users_list';
@@ -170,4 +171,73 @@ class UserPrefs {
   static Future<void> saveProfileImage(String newAvatarUrl) async {}
 
   static Future<void> clearProfileImage() async {}
+
+  // === WEEKLY CHALLENGES ===
+  static const _keyCurrentChallenge = 'current_weekly_challenge';
+  static const _keyChallengeHistory = 'challenge_history';
+
+  static Future<void> saveCurrentChallenge(WeeklyChallenge challenge) async {
+    final prefs = await _instance;
+    await prefs.setString(_keyCurrentChallenge, jsonEncode(challenge.toJson()));
+  }
+
+  static Future<WeeklyChallenge?> loadCurrentChallenge() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_keyCurrentChallenge);
+    if (raw == null) return null;
+    try {
+      return WeeklyChallenge.fromJson(Map<String, dynamic>.from(jsonDecode(raw)));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> updateChallengeProgress(String challengeId, int newValue) async {
+    final challenge = await loadCurrentChallenge();
+    if (challenge != null && challenge.id == challengeId) {
+      final updated = challenge.copyWith(
+        currentValue: newValue,
+        isCompleted: newValue >= challenge.targetValue,
+      );
+      await saveCurrentChallenge(updated);
+      
+      if (updated.isCompleted && !challenge.isCompleted) {
+        await _completeChallengeAndAddToHistory(updated);
+      }
+    }
+  }
+
+  static Future<void> _completeChallengeAndAddToHistory(WeeklyChallenge challenge) async {
+    final history = ChallengeHistory(
+      challengeId: challenge.id,
+      completedDate: DateTime.now(),
+      badgeEarned: challenge.badgeIcon ?? '🏆',
+    );
+    await addChallengeToHistory(history);
+    await unlockAchievement('weekly_challenge_${challenge.type}');
+  }
+
+  static Future<void> addChallengeToHistory(ChallengeHistory history) async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_keyChallengeHistory) ?? '[]';
+    final list = jsonDecode(raw) as List<dynamic>;
+    list.add(history.toJson());
+    await prefs.setString(_keyChallengeHistory, jsonEncode(list));
+  }
+
+  static Future<List<ChallengeHistory>> loadChallengeHistory() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_keyChallengeHistory) ?? '[]';
+    return (jsonDecode(raw) as List<dynamic>)
+        .map((e) => ChallengeHistory.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static Future<void> clearExpiredChallenge() async {
+    final challenge = await loadCurrentChallenge();
+    if (challenge != null && !challenge.isActive) {
+      final prefs = await _instance;
+      await prefs.remove(_keyCurrentChallenge);
+    }
+  }
 }

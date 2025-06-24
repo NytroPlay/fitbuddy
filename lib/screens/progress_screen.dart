@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 import '../utils/user_prefs.dart';
+import '../services/weekly_challenge_service.dart';
+import '../models/weekly_challenge.dart';
 // Asegúrate de que tu modelo User tenga `double weight`
 
 class ProgressScreen extends StatefulWidget {
@@ -46,7 +48,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadUserWeight();
   }
 
@@ -80,12 +82,13 @@ class _ProgressScreenState extends State<ProgressScreen>
             Tab(text: 'Resumen'),
             Tab(text: 'Estadísticas'),
             Tab(text: 'Historial'),
+            Tab(text: 'Desafíos'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [_buildSummaryTab(), _buildStatsTab(), _buildHistoryTab()],
+        children: [_buildSummaryTab(), _buildStatsTab(), _buildHistoryTab(), _buildChallengesTab()],
       ),
     );
   }
@@ -551,6 +554,384 @@ class _ProgressScreenState extends State<ProgressScreen>
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: AppColors.textSecondary)),
       ],
+    );
+  }
+
+  // -------------------
+  // PESTAÑA DESAFÍOS
+  // -------------------
+  Widget _buildChallengesTab() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _loadChallengeData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final challengeData = snapshot.data;
+        if (challengeData == null) {
+          return const Center(child: Text('Error cargando datos'));
+        }
+
+        final currentChallenge = challengeData['current'] as WeeklyChallenge?;
+        final history = challengeData['history'] as List<ChallengeHistory>;
+        final stats = challengeData['stats'] as Map<String, int>;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current Challenge Section
+              if (currentChallenge != null) ...[
+                const Text(
+                  'Desafío Actual',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildCurrentChallengeCard(currentChallenge),
+                const SizedBox(height: 24),
+              ],
+
+              // Statistics Section
+              const Text(
+                'Estadísticas de Desafíos',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildChallengeStats(stats),
+              const SizedBox(height: 24),
+
+              // History Section
+              const Text(
+                'Historial de Desafíos',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (history.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.shadow,
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.emoji_events_outlined,
+                        size: 48,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Aún no has completado ningún desafío',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '¡Completa tu primer desafío semanal para comenzar!',
+                        style: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ...history.map((challenge) => _buildChallengeHistoryItem(challenge)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _loadChallengeData() async {
+    final current = await WeeklyChallengeService.getCurrentChallenge();
+    final history = await WeeklyChallengeService.getChallengeHistory();
+    final stats = await WeeklyChallengeService.getChallengeStats();
+    
+    return {
+      'current': current,
+      'history': history,
+      'stats': stats,
+    };
+  }
+
+  Widget _buildCurrentChallengeCard(WeeklyChallenge challenge) {
+    final progress = challenge.progress;
+    final isCompleted = challenge.isCompleted;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+        gradient: isCompleted
+            ? LinearGradient(
+                colors: [
+                  AppColors.success.withOpacity(0.1),
+                  AppColors.primaryLight.withOpacity(0.1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isCompleted 
+                      ? AppColors.success 
+                      : AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Center(
+                  child: Text(
+                    challenge.badgeIcon ?? '🏆',
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      challenge.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      challenge.description,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isCompleted)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.success,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '¡Completado!',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Progreso: ${challenge.currentValue}/${challenge.targetValue}',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '${(progress * 100).toInt()}%',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isCompleted ? AppColors.success : AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: AppColors.inputBorder,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              isCompleted ? AppColors.success : AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    challenge.daysRemaining == 0 
+                        ? 'Último día' 
+                        : '${challenge.daysRemaining} días restantes',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              if (!isCompleted)
+                Text(
+                  '¡Sigue así!',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChallengeStats(Map<String, int> stats) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            'Completados',
+            '${stats['totalCompleted'] ?? 0}',
+            'Total',
+            Icons.emoji_events,
+            AppColors.warning,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildSummaryCard(
+            'Este mes',
+            '${stats['thisMonth'] ?? 0}',
+            'Desafíos',
+            Icons.calendar_month,
+            AppColors.info,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildSummaryCard(
+            'Últimos 30d',
+            '${stats['last30Days'] ?? 0}',
+            'Completados',
+            Icons.trending_up,
+            AppColors.success,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChallengeHistoryItem(ChallengeHistory challenge) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Center(
+              child: Text(
+                challenge.badgeEarned,
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Desafío Completado',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Completado el ${challenge.completedDate.day}/${challenge.completedDate.month}/${challenge.completedDate.year}',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.check_circle,
+            color: AppColors.success,
+            size: 24,
+          ),
+        ],
+      ),
     );
   }
 }

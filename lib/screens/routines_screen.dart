@@ -6,6 +6,8 @@ import '../models/exercise.dart';
 import 'execute_routine_screen.dart';
 import '../models/routine_history.dart';
 import 'history_screen.dart';
+import '../widgets/weekly_challenge_card.dart';
+import '../services/weekly_challenge_service.dart';
 // ignore: depend_on_referenced_packages
 
 class RoutinesScreen extends StatefulWidget {
@@ -87,6 +89,9 @@ class _RoutinesScreenState extends State<RoutinesScreen>
       ),
       body: Column(
         children: [
+          // Weekly Challenge Card
+          WeeklyChallengeCard(),
+          
           // Header con estadísticas
           Container(
             margin: EdgeInsets.all(16),
@@ -529,7 +534,7 @@ class _RoutinesScreenState extends State<RoutinesScreen>
         builder: (context) => ExecuteRoutineScreen(
           routineName: routine['name'],
           exercises: List<Exercise>.from(routine['exerciseList']),
-          onFinish: (completed, total) {
+          onFinish: (completed, total) async {
             setState(() {
               _history.add(
                 RoutineHistory(
@@ -540,6 +545,11 @@ class _RoutinesScreenState extends State<RoutinesScreen>
                 ),
               );
             });
+            
+            // Update weekly challenge progress
+            if (completed == total) {
+              await WeeklyChallengeService.onWorkoutCompleted();
+            }
           },
         ),
       ),
