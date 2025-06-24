@@ -12,6 +12,7 @@ class FeedbackScreen extends StatefulWidget {
 class _FeedbackScreenState extends State<FeedbackScreen> {
   final _formKey = GlobalKey<FormState>();
   String _tipo = 'Sugerencia';
+  // ignore: unused_field
   String _mensaje = '';
   bool _anonimo = false;
   String? _email;
@@ -40,6 +41,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     await UserPrefs.unlockAchievement('primer_feedback');
 
     ScaffoldMessenger.of(
+      // ignore: use_build_context_synchronously
       context,
     ).showSnackBar(const SnackBar(content: Text('¡Gracias por tu feedback!')));
 

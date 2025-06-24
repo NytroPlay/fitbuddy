@@ -120,8 +120,8 @@ class _RoutinesScreenState extends State<RoutinesScreen>
                   '${_routines.length}',
                   Icons.fitness_center,
                 ),
-                _buildStatItem('Esta semana', '4', Icons.calendar_today),
-                _buildStatItem('Tiempo total', '3h 15m', Icons.timer),
+                _buildStatItem('Esta semana', _getNumberOfExercisesInTheWeek(), Icons.calendar_today),
+                _buildStatItem('Tiempo total', _getTotalTime(), Icons.timer),
               ],
             ),
           ),
@@ -148,6 +148,19 @@ class _RoutinesScreenState extends State<RoutinesScreen>
         label: Text('Nueva Rutina'),
       ),
     );
+  }
+
+  String _getNumberOfExercisesInTheWeek() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day - 7);
+    final firstDayOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    return _history.where((element) => !DateTime(element.date.year, element.date.month, element.date.day).isBefore(firstDayOfWeek)).length.toString();
+  }
+
+  String _getTotalTime() {
+    return _history.fold<int>(0, (previousValue, element) {
+      return previousValue + element.duration;
+    }).toString();
   }
 
   Widget _buildStatItem(String label, String value, IconData icon) {
@@ -540,6 +553,7 @@ class _RoutinesScreenState extends State<RoutinesScreen>
                 RoutineHistory(
                   routineName: routine['name'],
                   date: DateTime.now(),
+                  duration: _getRoutineDuration(routine['duration'], total, completed),
                   completedExercises: completed,
                   totalExercises: total,
                 ),
@@ -554,6 +568,10 @@ class _RoutinesScreenState extends State<RoutinesScreen>
         ),
       ),
     );
+  }
+
+  int _getRoutineDuration(String duration, int total, int completed) {
+    return ((int.parse(duration.split(' ')[0]) / total) * completed).round();
   }
 
   Future<void> _showCreateRoutineSheet(BuildContext context) async {

@@ -117,8 +117,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           _selectedAvatar = null;
         }
       } else {
-        // si no hay en profile_image, usar avatarUrl del usuario
-        final av = _user!.avatarUrl ?? '';
+        // si no hay en profile_image, usar avatar del usuario
+        final av = _user!.avatar ?? '';
         if (av.startsWith('avatar:')) {
           _selectedAvatar = av.substring(7);
           _profileImage = null;
@@ -166,25 +166,25 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (_user == null) return;
     setState(() => _isLoading = true);
 
-    String newAvatarUrl;
+    String newAvatar;
     if (isEmoji) {
       _selectedAvatar = data as String;
       _profileImage = null;
-      newAvatarUrl = 'avatar:$_selectedAvatar';
+      newAvatar = 'avatar:$_selectedAvatar';
     } else {
       _profileImage = data as File;
       _selectedAvatar = null;
-      newAvatarUrl = _profileImage!.path;
+      newAvatar = _profileImage!.path;
     }
 
     // 1) actualizar en UserPrefs.users_list
-    final updated = _user!.copyWith(avatarUrl: newAvatarUrl);
+    final updated = _user!.copyWith(avatar: newAvatar);
     await UserPrefs.saveUser(updated);
     // ignore: use_build_context_synchronously
     Provider.of<AuthProvider>(context, listen: false).setUser(updated);
 
     // 2) también guardo en la clave profile_image
-    await UserPrefs.saveProfileImage(newAvatarUrl);
+    await UserPrefs.saveProfileImage(newAvatar);
 
     setState(() {
       _user = updated;
@@ -196,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (_user == null) return;
     setState(() => _isLoading = true);
 
-    final updated = _user!.copyWith(avatarUrl: '');
+    final updated = _user!.copyWith(avatar: '');
     await UserPrefs.saveUser(updated);
     // ignore: use_build_context_synchronously
     Provider.of<AuthProvider>(context, listen: false).setUser(updated);
@@ -217,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _isLoading = true);
 
     try {
-      final currentAv = _user!.avatarUrl ?? '';
+      final currentAv = _user!.avatar ?? '';
       final updated = _user!.copyWith(
         name: _nameCtrl.text.trim(),
         phone: _phoneCtrl.text.trim().isNotEmpty
@@ -226,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         age: int.tryParse(_ageCtrl.text.trim()),
         height: double.tryParse(_heightCtrl.text.trim()),
         weight: double.tryParse(_weightCtrl.text.trim()),
-        avatarUrl: currentAv,
+        avatar: currentAv,
       );
 
       // actualizar lista de usuarios
