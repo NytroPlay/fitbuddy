@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../widgets/motivational_tip_card.dart';
 
 import '../auth/auth_provider.dart';
 import '../models/user.dart';
@@ -371,7 +372,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                
+                // Daily Motivational Tip
+                const DailyTipDisplay(),
+                
+                const SizedBox(height: 16),
                 _buildTextField(
                   'Nombre completo',
                   _nameCtrl,

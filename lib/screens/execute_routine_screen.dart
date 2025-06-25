@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../models/exercise.dart';
 import '../utils/app_theme.dart';
+import '../widgets/motivational_tip_card.dart';
+import '../services/motivational_tips_service.dart';
 
 class ExecuteRoutineScreen extends StatefulWidget {
   final String routineName;
@@ -49,16 +51,80 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
     super.dispose();
   }
 
-  void _finishRoutine() {
+  void _finishRoutine() async {
     final completados = _completed.where((c) => c).length;
     widget.onFinish?.call(completados, widget.exercises.length);
+
+    // Get a post-workout motivational tip
+    final tip = await MotivationalTipsService.getPostWorkoutTip();
+
+    if (!mounted) return;
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('¡Rutina completada!'),
-        content: Text(
-          'Completaste $completados de ${widget.exercises.length} ejercicios.',
+        title: Row(
+          children: [
+            Icon(Icons.celebration, color: AppColors.success, size: 28),
+            const SizedBox(width: 8),
+            Text('¡Rutina completada!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Completaste $completados de ${widget.exercises.length} ejercicios.',
+              style: const TextStyle(fontSize: 16),
+            ),
+            if (tip != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          tip.icon,
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            tip.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      tip.message,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -66,7 +132,13 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
               Navigator.pop(context); // Cierra el dialog
               Navigator.pop(context); // Vuelve a la pantalla anterior
             },
-            child: Text('Cerrar'),
+            child: Text(
+              '¡Excelente!',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
