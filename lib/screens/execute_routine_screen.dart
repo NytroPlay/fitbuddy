@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../models/exercise.dart';
 import '../utils/app_theme.dart';
-import '../widgets/motivational_tip_card.dart';
 import '../services/motivational_tips_service.dart';
 
 class ExecuteRoutineScreen extends StatefulWidget {
@@ -83,9 +82,11 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
+                  // ignore: deprecated_member_use
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
+                    // ignore: deprecated_member_use
                     color: AppColors.primary.withOpacity(0.3),
                   ),
                 ),
@@ -94,10 +95,7 @@ class _ExecuteRoutineScreenState extends State<ExecuteRoutineScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          tip.icon,
-                          style: const TextStyle(fontSize: 20),
-                        ),
+                        Text(tip.icon, style: const TextStyle(fontSize: 20)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(

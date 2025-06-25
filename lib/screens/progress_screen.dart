@@ -88,7 +88,12 @@ class _ProgressScreenState extends State<ProgressScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [_buildSummaryTab(), _buildStatsTab(), _buildHistoryTab(), _buildChallengesTab()],
+        children: [
+          _buildSummaryTab(),
+          _buildStatsTab(),
+          _buildHistoryTab(),
+          _buildChallengesTab(),
+        ],
       ),
     );
   }
@@ -586,10 +591,7 @@ class _ProgressScreenState extends State<ProgressScreen>
               if (currentChallenge != null) ...[
                 const Text(
                   'Desafío Actual',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 _buildCurrentChallengeCard(currentChallenge),
@@ -599,10 +601,7 @@ class _ProgressScreenState extends State<ProgressScreen>
               // Statistics Section
               const Text(
                 'Estadísticas de Desafíos',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               _buildChallengeStats(stats),
@@ -611,10 +610,7 @@ class _ProgressScreenState extends State<ProgressScreen>
               // History Section
               const Text(
                 'Historial de Desafíos',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               if (history.isEmpty)
@@ -660,7 +656,9 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ),
                 )
               else
-                ...history.map((challenge) => _buildChallengeHistoryItem(challenge)),
+                ...history.map(
+                  (challenge) => _buildChallengeHistoryItem(challenge),
+                ),
             ],
           ),
         );
@@ -672,12 +670,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     final current = await WeeklyChallengeService.getCurrentChallenge();
     final history = await WeeklyChallengeService.getChallengeHistory();
     final stats = await WeeklyChallengeService.getChallengeStats();
-    
-    return {
-      'current': current,
-      'history': history,
-      'stats': stats,
-    };
+
+    return {'current': current, 'history': history, 'stats': stats};
   }
 
   Widget _buildCurrentChallengeCard(WeeklyChallenge challenge) {
@@ -699,7 +693,9 @@ class _ProgressScreenState extends State<ProgressScreen>
         gradient: isCompleted
             ? LinearGradient(
                 colors: [
+                  // ignore: deprecated_member_use
                   AppColors.success.withOpacity(0.1),
+                  // ignore: deprecated_member_use
                   AppColors.primaryLight.withOpacity(0.1),
                 ],
                 begin: Alignment.topLeft,
@@ -716,8 +712,9 @@ class _ProgressScreenState extends State<ProgressScreen>
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isCompleted 
-                      ? AppColors.success 
+                  color: isCompleted
+                      ? AppColors.success
+                      // ignore: deprecated_member_use
                       : AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(24),
                 ),
@@ -752,7 +749,10 @@ class _ProgressScreenState extends State<ProgressScreen>
               ),
               if (isCompleted)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.success,
                     borderRadius: BorderRadius.circular(16),
@@ -809,8 +809,8 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    challenge.daysRemaining == 0 
-                        ? 'Último día' 
+                    challenge.daysRemaining == 0
+                        ? 'Último día'
                         : '${challenge.daysRemaining} días restantes',
                     style: TextStyle(
                       color: AppColors.textSecondary,
@@ -892,6 +892,7 @@ class _ProgressScreenState extends State<ProgressScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: AppColors.success.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -925,11 +926,7 @@ class _ProgressScreenState extends State<ProgressScreen>
               ],
             ),
           ),
-          Icon(
-            Icons.check_circle,
-            color: AppColors.success,
-            size: 24,
-          ),
+          Icon(Icons.check_circle, color: AppColors.success, size: 24),
         ],
       ),
     );

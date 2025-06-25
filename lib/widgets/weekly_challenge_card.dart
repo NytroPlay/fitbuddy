@@ -6,10 +6,7 @@ import '../utils/app_theme.dart';
 class WeeklyChallengeCard extends StatefulWidget {
   final VoidCallback? onChallengeCompleted;
 
-  const WeeklyChallengeCard({
-    Key? key,
-    this.onChallengeCompleted,
-  }) : super(key: key);
+  const WeeklyChallengeCard({super.key, this.onChallengeCompleted});
 
   @override
   State<WeeklyChallengeCard> createState() => _WeeklyChallengeCardState();
@@ -33,7 +30,7 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
           _currentChallenge = challenge;
           _isLoading = false;
         });
-        
+
         // Check if challenge was just completed
         if (challenge.isCompleted) {
           _showChallengeCompletedNotification(challenge);
@@ -77,6 +74,7 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
                     challenge.title,
                     style: TextStyle(
                       fontSize: 12,
+                      // ignore: deprecated_member_use
                       color: Colors.white.withOpacity(0.9),
                     ),
                   ),
@@ -89,9 +87,7 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         action: SnackBarAction(
           label: 'Ver Logros',
           textColor: Colors.white,
@@ -124,9 +120,7 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
       child: Container(
         height: 120,
         padding: const EdgeInsets.all(16),
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        child: const Center(child: CircularProgressIndicator()),
       ),
     );
   }
@@ -169,7 +163,9 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
           gradient: isCompleted
               ? LinearGradient(
                   colors: [
+                    // ignore: deprecated_member_use
                     AppColors.primary.withOpacity(0.1),
+                    // ignore: deprecated_member_use
                     AppColors.primaryLight.withOpacity(0.1),
                   ],
                   begin: Alignment.topLeft,
@@ -186,8 +182,9 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: isCompleted 
-                        ? AppColors.primary 
+                    color: isCompleted
+                        ? AppColors.primary
+                        // ignore: deprecated_member_use
                         : AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -220,7 +217,10 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
                 ),
                 if (isCompleted)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.success,
                       borderRadius: BorderRadius.circular(12),
@@ -256,9 +256,8 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
                           ),
                           Text(
                             '${(progress * 100).toInt()}%',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -283,8 +282,8 @@ class _WeeklyChallengeCardState extends State<WeeklyChallengeCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      challenge.daysRemaining == 0 
-                          ? 'Último día' 
+                      challenge.daysRemaining == 0
+                          ? 'Último día'
                           : '${challenge.daysRemaining}d',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
